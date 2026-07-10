@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>LocalMarks</title>
+	<link rel="icon" href="favicon.ico">
+	<link rel="stylesheet" href="stylesheet/style.css">
+	<link rel="stylesheet" href="stylesheet/themes/light.css" media="(prefers-color-scheme: light)">
+</head>
+<body>
+
+	<!-- ── TOP HEADER (shared across views) ── -->
+	<header class="top-header">
+		<div class="header-inner">
+			<div class="header-left">
+				<a href="#browse" class="logo-link" title="Bookmarks browser">
+					<img src="favicon.ico" alt="" width="50">
+				</a>
+				<h1 id="header-title">LocalMarks</h1>
+			</div>
+
+			<div class="header-right">
+				<div class="layout-toggle" id="layout-toggle" title="Layout">
+					<button class="layout-btn active" data-layout="single">☰</button>
+					<button class="layout-btn" data-layout="grid">▦</button>
+					<button class="layout-btn" data-layout="compact">≡</button>
+				</div>
+				<a href="#info" class="info-btn">📊 Info</a>
+				<a href="#random" class="info-btn">🎲 Random</a>
+			</div>
+		</div>
+
+		<div class="search-wrap" id="search-wrap">
+			<span class="search-icon">🔍</span>
+			<input type="text" id="search-input"
+				placeholder="Search bookmarks… (title, description, tags, url)	 Ctrl + K"
+				autocomplete="off" spellcheck="false">
+			<button id="clear-search" class="clear-btn" title="Clear search">✕</button>
+		</div>
+	</header>
+
+	<!-- ── BROWSE VIEW ── -->
+	<section id="view-browse" class="view">
+		<div class="page-body">
+			<aside class="sidebar" id="sidebar">
+				<div class="sidebar-heading">
+					<span>📂</span>
+					<span>Categories</span>
+					<span class="sidebar-count" id="sidebar-count"></span>
+				</div>
+				<ul class="category-list" id="category-list"></ul>
+			</aside>
+			<main class="main-panel" id="main-panel">
+				<div class="panel-top" id="panel-top">
+					<div class="panel-title" id="panel-title">Loading…</div>
+					<div class="tag-bar" id="tag-bar"></div>
+				</div>
+				<div class="bookmark-list" id="bookmark-list"></div>
+			</main>
+		</div>
+	</section>
+
+	<!-- ── INFO VIEW ── -->
+	<section id="view-info" class="view">
+		<div class="info-body">
+			<div class="stats-strip" id="stats-strip">
+				<div class="stat-card">
+					<div class="stat-num" id="stat-total">—</div>
+					<div class="stat-label">Total Bookmarks</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-num" id="stat-unique">—</div>
+					<div class="stat-label">Unique URLs</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-num" id="stat-cats">—</div>
+					<div class="stat-label">Categories</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-num" id="stat-domains">—</div>
+					<div class="stat-label">Unique Domains</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-num" id="stat-tags">—</div>
+					<div class="stat-label">Unique Tags</div>
+				</div>
+			</div>
+			<div class="info-grid">
+				<section class="info-section">
+					<h2 class="section-title">By Category</h2>
+					<div id="cat-breakdown"></div>
+				</section>
+				<section class="info-section">
+					<h2 class="section-title">Top Tags</h2>
+					<div id="tag-breakdown"></div>
+				</section>
+			</div>
+			<section class="info-section full-width">
+				<h2 class="section-title">Domains <span id="domain-count-label" class="section-count"></span></h2>
+				<div class="domain-grid" id="domain-grid"></div>
+			</section>
+		</div>
+	</section>
+
+	<!-- ── RANDOM VIEW ── -->
+	<section id="view-random" class="view">
+		<div class="random-body">
+			<div class="random-controls">
+				<label for="random-count">How many random links?</label>
+				<div class="random-input-row">
+					<input type="number" id="random-count" value="3" min="1" max="999">
+					<select id="random-cat" class="random-cat-select"><option value="">All categories</option></select>
+					<input type="text" id="random-tag" placeholder="#tag (optional)" autocomplete="off">
+					<button id="random-go" class="random-go-btn">🎲 Go</button>
+				</div>
+			</div>
+			<div class="random-stats" id="random-stats">
+				<span class="random-info" id="random-info"></span>
+				<button id="random-open-all" class="random-open-btn" hidden>Open all</button>
+			</div>
+			<div class="bookmark-list" id="random-results"></div>
+		</div>
+	</section>
+
+	<script type="module" src="javascript/main.js"></script>
+</body>
+</html>
