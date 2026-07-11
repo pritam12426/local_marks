@@ -33,22 +33,26 @@ static void log_request(const char        *client_ip,
                         long long          bytes,
                         const char        *mime)
 {
+	const char *vfs_path = req->path;
+	if (*vfs_path == '/') vfs_path++;
+	if (*vfs_path == '\0') vfs_path = "index.html";
+
 	if (bytes >= 0 && mime) {
-		LOG_INFO("%s:%d \"%s %s %s\" %d - (%lld bytes, %s)",
+		LOG_INFO("%s:%d \"%s vfs:%s %s\" %d - (%lld bytes, %s)",
 		         client_ip,
 		         client_port,
 		         http_method_str(req->method),
-		         req->path,
+		         vfs_path,
 		         req->version,
 		         status,
 		         bytes,
 		         mime);
 	} else {
-		LOG_INFO("%s:%d \"%s %s %s\" %d",
+		LOG_INFO("%s:%d \"%s vfs:%s %s\" %d",
 		         client_ip,
 		         client_port,
 		         http_method_str(req->method),
-		         req->path,
+		         vfs_path,
 		         req->version,
 		         status);
 	}
@@ -76,6 +80,8 @@ int file_serve(const HttpRequest *req,
 	/* Default to index.html for root */
 	if (*path == '\0')
 		path = "index.html";
+
+	const char *vfs_path = path;  // Path used for VFS lookup
 
 	const vfs_entry *entry = vfs_lookup(path);
 	if (!entry) {
@@ -108,8 +114,8 @@ int file_serve(const HttpRequest *req,
 		return 304;
 	}
 
-	LOG_INFO("%s:%d \"%s %s\" (%s, %zu bytes%s)",
-	         client_ip, client_port, http_method_str(req->method), req->path, mime, len,
+	LOG_INFO("%s:%d \"%s vfs:%s\" (%s, %zu bytes%s)",
+	         client_ip, client_port, http_method_str(req->method), vfs_path, mime, len,
 	         is_gzipped ? ", gzip" : "");
 
 	/* Range request handling */

@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "common.h"
+
 typedef struct {
 	const char *host;
 	int         port;
@@ -13,7 +15,8 @@ typedef struct {
 	bool    print_request;
 	const char *browser;
 
-	const char *bookmark_file;  // Path to bookmark JSON file (first of DB_FILE(s))
+	const char *bookmark_files[MAX_BOOKMARK_FILES];
+	int           bookmark_file_count;
 
 	int thread_pool_size;
 	int keep_alive_timeout;

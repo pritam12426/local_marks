@@ -15,7 +15,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "api.h"
 #include "auth.h"
+#include "bookmark_cache.h"
+#include "databases_meta.h"
 #include "file.h"
 #include "http.h"
 #include "log.h"
@@ -25,57 +28,6 @@
 #include "transport.h"
 
 static atomic_int g_shutdown = 0;
-
-// Bookmark JSON content (loaded once at startup)
-static char *g_bookmark_json = NULL;
-static size_t g_bookmark_json_len = 0;
-
-// Load bookmark JSON file into memory
-static int load_bookmark_json(const char *path)
-{
-	if (!path) {
-		LOG_INFO("No bookmark file configured");
-		return 0;
-	}
-
-	FILE *f = fopen(path, "rb");
-	if (!f) {
-		LOG_ERROR("Failed to open bookmark file '%s': %s", path, strerror(errno));
-		return -1;
-	}
-
-	fseek(f, 0, SEEK_END);
-	long size = ftell(f);
-	fseek(f, 0, SEEK_SET);
-
-	if (size < 0) {
-		LOG_ERROR("Failed to determine size of '%s'", path);
-		fclose(f);
-		return -1;
-	}
-
-	g_bookmark_json = malloc((size_t)size + 1);
-	if (!g_bookmark_json) {
-		LOG_ERROR("Failed to allocate %ld bytes for bookmark JSON", size);
-		fclose(f);
-		return -1;
-	}
-
-	size_t read = fread(g_bookmark_json, 1, (size_t)size, f);
-	fclose(f);
-
-	if (read != (size_t)size) {
-		LOG_ERROR("Short read on '%s': expected %ld, got %zu", path, size, read);
-		free(g_bookmark_json);
-		g_bookmark_json = NULL;
-		return -1;
-	}
-
-	g_bookmark_json[read] = '\0';
-	g_bookmark_json_len = read;
-	LOG_INFO("Loaded bookmark database: %s (%zu bytes)", path, g_bookmark_json_len);
-	return 0;
-}
 
 static void handle_signal(int sig)
 {
@@ -99,7 +51,7 @@ static int wants_keep_alive(const HttpRequest *req, int keep_alive_timeout)
 	int conn_close = (strcasestr(req->connection, "close") != NULL);
 	int conn_keep_alive = (strcasestr(req->connection, "keep-alive") != NULL);
 	int ka = http11 ? !conn_close : conn_keep_alive;
-	LOG_DEBUG("Keep-alive decision: %s (http11=%d, close=%d, keep-alive=%d, timeout=%d) → %s",
+	LOG_DEBUG("Keep-alive decision: %s (http11=%d, close=%d, keep-alive=%d, timeout=%d) -> %s",
 	          req->version, http11, conn_close, conn_keep_alive,
 	          keep_alive_timeout, ka ? "yes" : "no");
 	return ka;
@@ -140,52 +92,15 @@ static void handle_client(void *arg)
 			}
 		}
 
-		// Serve bookmark database at /bookmarks.json
-		if (req.method == HTTP_GET && cfg.bookmark_file &&
-		    strcmp(req.path, "/bookmarks.json") == 0) {
-			FILE *fp = fopen(cfg.bookmark_file, "r");
-			if (!fp) {
-				LOG_ERROR("Failed to open bookmark file '%s': %s",
-				          cfg.bookmark_file, strerror(errno));
-				response_error(t, 500, "Internal Server Error",
-				               "Cannot open bookmark database");
-			} else {
-				fseek(fp, 0, SEEK_END);
-				long fsize = ftell(fp);
-				fseek(fp, 0, SEEK_SET);
-
-				char *buf = malloc((size_t)fsize + 1);
-				if (!buf) {
-					LOG_ERROR("OOM reading bookmark file");
-					response_error(t, 500, "Internal Server Error",
-					               "Out of memory");
-				} else {
-					size_t read = fread(buf, 1, (size_t)fsize, fp);
-					buf[read] = '\0';
-					fclose(fp);
-
-					char extra[128];
-					snprintf(extra, sizeof extra,
-					         "Cache-Control: no-cache\r\n");
-					response_send(t, 200, "OK",
-					              "application/json; charset=utf-8",
-					              extra, buf, read,
-					              keep_alive, 1);
-					free(buf);
-					if (cfg.print_request)
-						LOG_INFO("%s:%d \"GET /bookmarks.json %s\" 200 - (%lld bytes, application/json)",
-						         client_ip, client_port, req.version, (long long)read);
-				}
-			}
-			if (fp) fclose(fp);
-			// Don't call file_serve for this path
+		// Handle API endpoints first
+		if (api_handle_request(&req, t, client_ip, client_port,
+		                       &cfg, keep_alive, cfg.print_request)) {
+			// API handled the request
 		} else {
+			// Fall through to file serving
 			keep_alive = wants_keep_alive(&req, cfg.keep_alive_timeout);
-
-			file_serve(&req,
-			           t, client_ip, client_port,
-			           cfg.print_request,
-			           keep_alive);
+			file_serve(&req, t, client_ip, client_port,
+			           cfg.print_request, keep_alive);
 		}
 
 		if (!keep_alive) {
@@ -270,7 +185,6 @@ static void peer_addr(int fd, char *ip_buf, size_t ip_len, int *port_out)
 	}
 }
 
-// Fork a child process to open a browser at the server URL
 static void open_browser(const char *browser, const char *host, int port, bool tls)
 {
 	char url[256];
@@ -279,7 +193,6 @@ static void open_browser(const char *browser, const char *host, int port, bool t
 
 	pid_t pid = fork();
 	if (pid == 0) {
-		// Child: exec the requested browser; fall back to system open
 		execlp(browser, browser, url, (char *)NULL);
 #if defined(__linux__)
 		LOG_WARN("Browser '%s' not found, trying xdg-open fallback", browser);
@@ -289,7 +202,7 @@ static void open_browser(const char *browser, const char *host, int port, bool t
 		LOG_WARN("Browser '%s' not found, trying open fallback", browser);
 		execlp("open", "open", url, (char *)NULL);
 		LOG_ERROR("open also failed to launch");
-#endif  // __linux__
+#endif
 		_exit(1);
 	}
 
@@ -297,7 +210,6 @@ static void open_browser(const char *browser, const char *host, int port, bool t
 		LOG_PERROR("fork for browser open");
 	}
 }
-
 
 int server_run(const ServerConfig *cfg)
 {
@@ -323,10 +235,11 @@ int server_run(const ServerConfig *cfg)
 		rl = ratelimit_create(cfg->max_conns_per_ip);
 	}
 
-	// Load bookmark JSON (first file for now)
-	if (load_bookmark_json(cfg->bookmark_file) != 0) {
-		LOG_WARN("Failed to load bookmark file, continuing without it");
-	}
+	// Populate metadata for all bookmark database files
+	populate_db_meta_all(cfg);
+
+	// Initialize bookmark cache
+	bookmark_cache_init();
 
 	LOG_INFO("Serving on http://%s:%d", cfg->host, cfg->port);
 	LOG_INFO("Thread pool: %d workers", cfg->thread_pool_size);
@@ -401,6 +314,10 @@ int server_run(const ServerConfig *cfg)
 	thread_pool_destroy(pool);
 
 	if (rl) ratelimit_destroy(rl);
+
+	// Cleanup
+	bookmark_cache_cleanup();
+	db_meta_cleanup();
 
 	LOG_INFO("Goodbye.");
 	return 0;

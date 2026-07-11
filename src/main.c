@@ -208,11 +208,14 @@ ServerConfig cfg = {
 		.pass              = G_Args.pass,
 		.print_request     = G_Args.print_request,
 		.browser           = G_Args.browser,
-		.bookmark_file     = G_Args.bookmark_file_count > 0 ? G_Args.bookmark_files[0] : NULL,
+		.bookmark_file_count = G_Args.bookmark_file_count,
 		.thread_pool_size  = G_Args.threads,
 		.keep_alive_timeout = G_Args.keep_alive,
 		.max_conns_per_ip  = G_Args.max_conns,
 	};
+	for (int i = 0; i < G_Args.bookmark_file_count; i++) {
+		cfg.bookmark_files[i] = G_Args.bookmark_files[i];
+	}
 
 	// Start HTTP server (blocks until SIGINT/SIGTERM)
 	server_run(&cfg);
