@@ -56,7 +56,7 @@ mkdir -p "$STAGE_DIR"
 	printf "\t{ 0, 0, 0 }\n};\n"
 } > "$OUT_C_FILE"
 
-rm -rf "$STAGE_DIR"
+# rm -rf "$STAGE_DIR"
 
 # ---- Header ----
 {

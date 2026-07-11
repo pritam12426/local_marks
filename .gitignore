@@ -83,3 +83,4 @@ dkms.conf
 /local-mark
 /third_party
 *.json
+*.log

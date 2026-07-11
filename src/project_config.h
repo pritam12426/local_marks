@@ -3,10 +3,10 @@
 
 
 #define PROJECT_NAME          "Local Marks"
-#define MAIN_BINARY           "local_mark"
+#define MAIN_BINARY           "local-mark"
 
 #define PROJECT_VERSION       "1.1.0"
-#define PROJECT_VERSION_MAJOR 0
+#define PROJECT_VERSION_MAJOR 1
 #define PROJECT_VERSION_MINOR 1
 #define PROJECT_VERSION_PATCH 0
 
@@ -15,7 +15,6 @@
 #define PROJECT_DESC          "Local-first bookmark browser — C17 server + static web UI"
 
 #define AUTH_MESSAGE          "Author: Pritam <84720825+pritam12426@users.noreply.github.com>"
-
 
 
 #endif  // _PROJECT_CONFIG_H_

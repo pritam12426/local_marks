@@ -1,7 +1,7 @@
 # Makefile — local-mark build system
 #
 # Targets:
-#   all     — release build (-O3, TLS disabled)
+#   all     — release build (-O3)
 #   debug   — debug build (-g3 -DDEBUG)
 #   strip   — strip debug symbols
 #   install — install to PREFIX
@@ -10,11 +10,8 @@
 #
 # Options (set via environment or on the command line):
 #   make debug -B O_DEBUG=1  — debug build
-#   make -B O_TLS=1          — enable TLS support via OpenSSL
 #
 # macOS prerequisite: brew install argp-standalone
-# TLS prerequisite:  OpenSSL (dev package), pkg-config
-#                     macOS: brew install openssl
 
 UNAME_S := $(shell uname -s)
 
@@ -22,11 +19,11 @@ PREFIX ?= /usr/local
 MANPREFIX ?= $(PREFIX)/share/man
 
 STRIP ?= strip
-PKG_CONFIG ?= pkg-config
 INSTALL ?= install
 
-BUILD = build
-BIN   = local-mark
+BUILD       =  build
+MARKS2JSON  =  marks2json.py
+BIN         =  local-mark
 
 HEADERS   = $(wildcard src/*.h)
 SRC      := $(wildcard src/*.c)
@@ -59,13 +56,9 @@ LDLIBS +=  -lpthread
 
 # Convert targets to flags for backwards compatibility
 O_DEBUG := 0  # Debug binary (0 = release, 1 = debug)
-O_TLS := 0    # TLS support  (0 = disabled, 1 = enabled)
 
 ifneq ($(filter debug,$(MAKECMDGOALS)),)
 	O_DEBUG := 1
-endif
-ifneq ($(filter norl,$(MAKECMDGOALS)),)
-	O_TLS := 0
 endif
 
 ifeq ($(strip $(O_DEBUG)),1)
@@ -81,12 +74,6 @@ ifeq ($(strip $(O_DEBUG)),1)
     endif
 else
 	CFLAGS += -O3
-endif
-ifeq ($(strip $(O_TLS)),1)
-	# TLS build: link OpenSSL (use pkg-config if available)
-	CFLAGS += -DTLS_SUPPORT
-	CFLAGS += $(shell $(PKG_CONFIG) --cflags openssl 2>/dev/null)
-	LDLIBS += $(shell $(PKG_CONFIG) --libs   openssl 2>/dev/null || echo "-lssl -lcrypto")
 endif
 
 # Platform-specific settings
@@ -109,7 +96,7 @@ help: ## Show this help
 $(BUILD): ## Create build directories automatically
 	mkdir -p $(BUILD)
 
-$(BUILD)/%.o: %.c
+$(BUILD)/%.o: %.c $(FRONT_END_GENERATED_H)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -132,6 +119,7 @@ debug: $(BIN) ## Build the debug binary run `make debug -B O_DEBUG=1`
 install: all ## Install the local-mark binary
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m 0755 $(BIN) $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL) -m 0755 $(MARKS2JSON) $(DESTDIR)$(PREFIX)/bin/marks2json
 
 clean: ## Clean up build artifacts
 	$(RM) -rf $(OUT) $(BIN) $(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_H)

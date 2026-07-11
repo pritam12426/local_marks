@@ -23,7 +23,7 @@
 
 /* Keep load factor under 50% for good average-case probe lengths, so we
  * size the table for 2x the expected file count, rounded up to a power
- * of two. At VFS_MAX_FILES=20 this comes out to 64, same as before —
+ * of two. At VFS_MAX_FILES=20 this comes out to 64 —
  * but now it scales automatically if you raise VFS_MAX_FILES. */
 #define VFS_HASH_CAP VFS_NEXT_POW2(VFS_MAX_FILES * 2)
 

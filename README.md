@@ -7,19 +7,18 @@
 	<br>
 </h1>
 
-Turn pipe-delimited bookmark files into a searchable, categorized local web UI. A single C++20 binary serves a static frontend with tag/domain filters, no network required — just a browser.
+Turn pipe-delimited bookmark files into a searchable, categorized local web UI. A single C17 binary serves a static frontend with tag/domain filters, no network required — just a browser.
 
 ## Table of Contents
 
 - [How it works](#how-it-works)
 - [Project structure](#project-structure)
 - [Getting started](#getting-started)
+- [Building from source](#building-from-source)
 - [Writing your .txt bookmark files](#writing-your-txt-bookmark-files)
 - [marks2json &mdash; the converter](#marks2json--the-converter)
 - [Running the viewer](#running-the-viewer)
-- [Building from source](#building-from-source)
 - [Features](#features)
-- [For developers](#for-developers)
 - [Bonus — bookmarkfmt](#bonus--bookmarkfmt)
 
 ---
@@ -27,12 +26,12 @@ Turn pipe-delimited bookmark files into a searchable, categorized local web UI. 
 ## How it works
 
 ```
-your .txt files  ──►  marks2json  ──►  bookmarks.json  ──►  local_mark  ──►  browser
+your .txt files  ──►  marks2json  ──►  bookmarks.json  ──►  local-mark  ──►  browser
 ```
 
 1. You keep bookmarks as human-readable pipe-separated `.txt` files
 2. `marks2json` converts them into a structured `bookmarks.json` database
-3. `local_mark` (a single C++20 binary) serves the JSON and the static frontend over HTTP
+3. `local-mark` (a single C17 binary) serves the JSON and the static frontend over HTTP
 4. No Electron, no Node, no Docker, no cloud
 
 ---
@@ -40,38 +39,37 @@ your .txt files  ──►  marks2json  ──►  bookmarks.json  ──►  lo
 ## Project structure
 
 ```
-LocalMarks_c/
+local_marks/
 ├── src/
-│   ├── main.c            # Entrypoint — CLI parsing, startup
-│   ├── log.h / log.c     # Logger with level gating, colors, timestamps
-│   └── project_config.h  # Version, name, metadata
+│   ├── main.c                       # Entrypoint — CLI parsing, startup
+│   ├── log.h / log.c                # Logger with level gating, colors, timestamps
+│   ├── common.h                     # Shared constants (MAX_BOOKMARK_FILES)
+│   ├── project_config.h             # Version, name, metadata
+│   ├── vfs_hash.h / vfs_hash.c      # Hash-table lookup for embedded frontend files
+│   ├── temp_hash_lookup.c           # Hash-table helpers
+│   └── gen_embedded_front_end_dir.h # Auto-generated: vfs_entry struct + extern arrays
 ├── front_end/
-│   ├── index.html           # SPA shell (browse/info/random views via hash routing)
+│   ├── embed_frontend.bash          # Script: xxd per-file → C arrays + vfs_entry table
+│   ├── index.html                   # SPA shell (browse/info/random views via hash routing)
 │   ├── javascript/
-│   │   ├── main.js          # Entry point, bootstraps data, hash router
-│   │   ├── data.js          # Shared helpers (fetch, card builder, layout, favorites)
-│   │   ├── browse.js        # Browse view (sidebar, search, tag filters, cards)
-│   │   ├── info.js          # Info view (stats, category chart, tag cloud, domain grid)
-│   │   └── random.js        # Random picker (category/tag filters, open all)
+│   │   ├── main.js                  # Entry point, bootstraps data, hash router
+│   │   ├── data.js                  # Shared helpers (fetch, card builder, layout, favorites)
+│   │   ├── browse.js                # Browse view (sidebar, search, tag filters, cards)
+│   │   ├── info.js                  # Info view (stats, category chart, tag cloud, domain grid)
+│   │   └── random.js                # Random picker (category/tag filters, open all)
 │   ├── stylesheet/
-│   │   ├── style.css        # All visual styles
-│   │   └── themes/          # Color themes
+│   │   ├── style.css                # All visual styles
+│   │   └── themes/                  # Color themes
 │   └── favicon.ico
-├── third_party
-│   ├── eduardsui_tlse-v1.0.7  # Single header file library for working with TLS with C17
-│   │   ├── libtomcrypt.c
-│   │   ├── tlse.c
-│   │   └── tlse.h
-│   └── tlse.h -> eduardsui_tlse-v1.0.7/tlse.h
-├── marks2json.py            # Python converter: .txt → JSON
-└── Makefile                 # Pure Makefile build (no CMake)
+├── marks2json.py                    # Python converter: .txt → JSON
+└── Makefile                         # Pure Makefile build (no CMake)
 ```
 
 ---
 
 ## Getting started
 
-### 1. Download or build `local_mark`
+### 1. Download or build `local-mark`
 
 **build from source** (see [Building from source](#building-from-source)).
 
@@ -83,13 +81,11 @@ LocalMarks_c/
 
 ### 3. Start the viewer
 
-With the binary:
-
 ```bash
-./local_mark --ui-frontend front_end bookmarks.json
+./local-mark bookmarks.json
 ```
 
-Open [http://localhost:8085](http://localhost:8085) (binary).
+Open [http://localhost:8080](http://localhost:8080).
 
 ---
 
@@ -184,23 +180,23 @@ update  FILE... -T DB [-O]      Append/override into existing database
 
 ```json
 {
-	"book_Marks": [
-		{
-			"category": "Free Time",
-			"bookmarks": [
-				{
-					"title": "akinator",
-					"url": "https://en.akinator.com",
-					"description": "Guess a celebrity",
-					"tags": ["#Game"],
-					"domain": "en.akinator.com",
-					"icon": "https://..."	 // YouTube channels with --icon
-				}
-			]
-		}
-	],
-	"book_mark_domain_hash": { "en.akinator.com": 1, "oddee.com": 3 },
-	"book_mark_tag_hash":		{ "#Game": 4, "#Dev": 12 }
+    "book_Marks": [
+        {
+            "category": "Free Time",
+            "bookmarks": [
+                {
+                    "title": "akinator",
+                    "url": "https://en.akinator.com",
+                    "description": "Guess a celebrity",
+                    "tags": ["#Game"],
+                    "domain": "en.akinator.com",
+                    "icon": "https://..."  // YouTube channels with --icon
+                }
+            ]
+        }
+    ],
+    "book_mark_domain_hash": { "en.akinator.com": 1, "oddee.com": 3 },
+    "book_mark_tag_hash":    { "#Game": 4, "#Dev": 12 }
 }
 ```
 
@@ -208,32 +204,25 @@ update  FILE... -T DB [-O]      Append/override into existing database
 
 ## Running the viewer
 
-### With the binary
-
-```bash
-./local_mark --ui-frontend front_end bookmarks.json
+```sh
+./local-mark first_bookmarks_DB.json second_bookmarks_DB.json
 ```
 
-| Argument            | Default          | Description                                                   |
-| ------------------- | ---------------- | ------------------------------------------------------------- |
-| `FILE`              | required         | Bookmark JSON file(s)                                         |
-| `--ui-frontend, -I` | required         | Path to `front_end/` directory                                |
-| `--port, -P`        | `8080`           | TCP port                                                      |
-| `--host, -H`        | `localhost`      | Listener address                                              |
-| `--user, -u`        | —                | Basic auth username                                           |
-| `--pass, -p`        | —                | Basic auth password                                           |
-| `--browser, -B`     | —                | Open browser on startup                                       |
-| `--log-level, -L`   | `info`           | `error`, `warn`, `info`, `debug`                              |
-| `--log-FILE, -F`    | `local_mark.log` | pass a custom file, descriptor, where you want to up and logs |
+### Options
 
-### With Python (dev server)
+| Argument      | Short | Default         | Description                       |
+| ------------- | ----- | --------------- | --------------------------------- |
+| `FILE`        |       | required        | Bookmark JSON file(s)             |
+| `--port`      | `-P`  | `8080`          | TCP port                          |
+| `--host`      | `-H`  | `localhost`     | Listener address                  |
+| `--user`      | `-u`  | —              | Basic auth username               |
+| `--pass`      | `-p`  | —              | Basic auth password               |
+| `--max-conns` | `-M`  | `0` (unlimited) | Max concurrent connections per IP |
+| `--browser`   | `-B`  | —              | Open browser on startup           |
+| `--log-level` | `-L`  | `info`          | `error`, `warn`, `info`, `debug`  |
+| `--log-file`  | `-F`  | stderr          | Append logs to file               |
 
-```bash
-cp bookmarks.json front_end/
-cd front_end/ && python3 -m http.server 8085
-```
-
-> The frontend must be served over HTTP — opening `index.html` as `file://` will not work (browsers block `fetch()` on local files).
+> The frontend is embedded in the binary and served over HTTP — opening `front_end/index.html` as `file://` will not work (browsers block `fetch()` on local files).
 
 ---
 
@@ -247,7 +236,7 @@ cd front_end/ && python3 -m http.server 8085
 ### Build
 
 ```sh
-make                     # release build → ./local_mark
+make                     # release build → ./local-mark
 make debug -B O_DEBUG=1  # debug build (-g3 -DDEBUG -DLOG_SHOW_SOURCE_LOCATION)
 make clean
 ```
@@ -288,25 +277,6 @@ No CMake — pure Makefile. Objects go to `build/`.
 - No framework, no dependencies at runtime
 
 ---
-
-## For developers
-
-```bash
-git clone https://github.com/pritam12426/LocalMarks_c.git
-cd LocalMarks_c
-make debug
-./local_mark --ui-frontend front_end bookmarks.json
-```
-
-### Frontend file responsibilities
-
-| File                   | Purpose                                                   |
-| ---------------------- | --------------------------------------------------------- |
-| `javascript/main.js`   | Entry point; bootstraps data, registers hash router       |
-| `javascript/data.js`   | Shared helpers (fetch, card builder, layout, favorites)   |
-| `javascript/browse.js` | Browse view (sidebar, search, tags, cards)                |
-| `javascript/info.js`   | Info view (stats, category chart, tag cloud, domain grid) |
-| `javascript/random.js` | Random picker with category/tag filters                   |
 
 ### Logging
 
