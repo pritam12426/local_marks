@@ -2,64 +2,85 @@
 
 ## Project
 
-Fast, local-first bookmark browser — C17 binary (`local_mark`) + static web UI.
-Reads `bookmarks.json` DB; serves frontend + API over HTTP.
-
-**Current state**: server logic not yet implemented. `main.c` parses CLI args,
-validates them, and exits.
+Local-first bookmark browser — C17 binary (`local-mark`) + embedded static web UI.
+Reads `bookmarks.json` DB; serves frontend + API over HTTP using a thread pool.
 
 ## Build
 
 ```sh
-make                           # release build → ./local_mark
+make                           # release build → ./local-mark
 make debug -B O_DEBUG=1        # debug build (-g3 -DDEBUG, sanitizers)
 make clean
-make O_TLS=1                   # TLS via OpenSSL (macOS: brew install openssl; needs pkg-config)
+make install                   # installs to PREFIX (default /usr/local)
 ```
 
 - Compiler: clang, `-std=c17`, source in `src/*.{c,h}`, objects → `build/`.
-- Deps: `-lpthread`; macOS `brew install argp-standalone` → `-largp`.
-- Build flags always on: `LOG_SHOW_TIME_STAMP`, `LOG_SHOW_SOURCE_LOCATION`.
-- Frontend is embedded into the binary: `make` tars `front_end/` → `build/front_end.tar` → linked `.o`. GNU `ld -r -b binary` on Linux; macOS uses `xxd -i` + `$(CC)` (Apple `ld` does not support `-b binary`).
+- macOS prerequisite: `brew install argp-standalone` (links `-largp`).
+- Linux: `-D_GNU_SOURCE` is added automatically.
+- Build flags always on: `LOG_SHOW_TIME_STAMP`, `LOG_SHOW_SOURCE_LOCATION` (README incorrectly says the latter is debug-only).
+- Debug builds enable `-fsanitize=address`, `-fsanitize=undefined`, `-fstack-usage`.
+- Frontend embedding: `front_end/embed_frontend.bash` runs `xxd -i` per file → C arrays + `vfs_entry` table in `build/gen_embedded_front_end_dir.c` + `src/gen_embedded_front_end_dir.h`. The script gzip-compresses each file before embedding. The Makefile re-runs it when any `FRONT_END_FILES` or the script changes.
 
 ## CLI
 
 Source of truth is `src/main.c` (differs from README):
 
-| Flags         | Short  | Value    | Description                                         |
-| ------------- | ------ | -------- | --------------------------------------------------- |
-| `--log-level` | `-L`   | `LEVEL`  | Log level: error/warn/info/debug (default info)      |
-| `--log-file`  | `-F`   | `FILE`   | Append logs to file (default stderr)                 |
-| `--user`      | `-u`   | `USER`   | Basic auth username                                  |
-| `--pass`      | `-p`   | `PASS`   | Basic auth password                                  |
-| `--max-conns` | `-M`   | `NUM`    | Max concurrent conns per IP (0 = unlimited)          |
-| `--port`      | `-P`   | `PORT`   | TCP port (default 8080)                              |
-| `--host`      | `-H`   | `HOST`   | Bind address (default localhost)                     |
-| `--browser`   | `-B`   | `BROWSER`| Browser to open on startup (e.g. firefox)           |
-| `--tls-cert`  | `-T`   | `PATH`   | TLS cert (requires `O_TLS=1` build)                 |
-| `--tls-key`   | `-K`   | `PATH`   | TLS key (requires `O_TLS=1` build)                  |
+| Flags             | Short | Value     | Description                                            |
+| ----------------- | ----- | --------- | ------------------------------------------------------ |
+| `--log-level`     | `-L`  | `LEVEL`   | Log level: error/warn/info/debug (default info)        |
+| `--log-file`      | `-F`  | `FILE`    | Append logs to file (default stderr)                   |
+| `--print-request` | `-R`  |           | Log each client request and its headers                |
+| `--user`          | `-u`  | `USER`    | Basic auth username                                    |
+| `--pass`          | `-p`  | `PASS`    | Basic auth password                                    |
+| `--port`          | `-P`  | `PORT`    | TCP port (default 8080)                                |
+| `--host`          | `-H`  | `HOST`    | Bind address (default localhost)                       |
+| `--threads`       | `-T`  | `NUM`     | Thread pool size (default 2)                           |
+| `--Keep-alive`    | `-K`  | `SECS`    | Keep-alive timeout in seconds (default 3, 0 = disable) |
+| `--max-conns`     | `-M`  | `NUM`     | Max concurrent conns per IP (0 = unlimited)            |
+| `--browser`       | `-B`  | `BROWSER` | Browser to open on startup                             |
 
 Positional `<DB_FILE(s)>...` required (max 10, set in `common.h`).
 
 ## Source layout
 
-| Path                      | Purpose                                                    |
-| ------------------------- | ---------------------------------------------------------- |
-| `src/main.c`              | Entrypoint — CLI parsing, validation, startup              |
-| `src/log.h` / `src/log.c` | Thread-safe logger (rwlock), timestamps, colors             |
-| `src/vfs.h` / `src/vfs.c` | Virtual filesystem — parses embedded tar at runtime         |
-| `src/common.h`            | Shared constants (MAX_BOOKMARK_FILES)                      |
-| `src/project_config.h`    | Version, name, metadata                                     |
-| `third_party/tlse.h`      | Symlink to eduardsui/tlse (unused by Makefile; gitignored) |
-| `front_end/`              | Static SPA (`index.html`, `javascript/`, `stylesheet/`)    |
-| `marks2json.py`           | Python converter: `create`/`update` subcommands            |
+| Path                                      | Purpose                                                 |
+| ----------------------------------------- | ------------------------------------------------------- |
+| `src/main.c`                              | Entrypoint — CLI parsing (argp), validation, startup    |
+| `src/server.c` / `src/server.h`           | Accept loop, thread pool dispatch, keep-alive           |
+| `src/http.c` / `src/http.h`               | HTTP request parser (GET/HEAD only, buffered)           |
+| `src/response.c` / `src/response.h`       | HTTP response builder (status, error, redirect)         |
+| `src/transport.c` / `src/transport.h`     | Opaque socket I/O wrapper (handles partial writes)      |
+| `src/auth.c` / `src/auth.h`               | HTTP Basic Authentication                               |
+| `src/ratelimit.c` / `src/ratelimit.h`     | Per-IP connection rate limiting (hash table)            |
+| `src/thread_pool.c` / `src/thread_pool.h` | Fixed-size thread pool (circular buffer)                |
+| `src/mime.c` / `src/mime.h`               | MIME type lookup by extension                           |
+| `src/log.c` / `src/log.h`                 | Thread-safe logger (rwlock), timestamps, colors         |
+| `src/file.c` / `src/file.h`               | VFS-based static file serving (no filesystem access)    |
+| `src/vfs_hash.c` / `src/vfs_hash.h`       | O(1) hash-table lookup for embedded frontend files      |
+| `src/gen_embedded_front_end_dir.h`        | Auto-generated: `vfs_entry` struct + extern arrays      |
+| `src/common.h`                            | Shared constants (MAX_BOOKMARK_FILES)                   |
+| `src/project_config.h`                    | Version, name, metadata                                 |
+| `front_end/`                              | Static SPA (`index.html`, `javascript/`, `stylesheet/`) |
+| `front_end/embed_frontend.bash`           | Script: xxd per-file → C arrays + vfs_entry table       |
+| `marks2json.py`                           | Python converter: `create`/`update` subcommands         |
+| `DEV.md`                                  | Detailed architecture docs (from live_server reference) |
+
+## Architecture
+
+Blocking-accept loop + fixed-size thread pool. No event loop library.
+Each accepted connection is dispatched as a `ClientJob` to the pool;
+the worker thread reads the HTTP request, serves the file, and
+optionally loops for keep-alive.
+
+Key lookup: `vfs_lookup("index.html")` returns an embedded `vfs_entry`
+from the hash table (no filesystem access for frontend files).
 
 ## Workflow
 
 ```sh
 marks2json create *.txt -T bookmarks.json          # create DB from pipe-delim .txt
 marks2json update *.txt -T bookmarks.json           # append new (--override to refresh)
-./local_mark bookmarks.json
+./local-mark bookmarks.json
 ```
 
 ## Logging
@@ -79,4 +100,8 @@ LOG_PERROR("bind failed");    // logs message + appends perror
 - `.clang-tidy` enforces clang-analyzer, readability, modernize, bugprone,
   misc-include-cleaner, llvm-header-guard.
 - No test framework exists.
-- Single-threaded (logger is thread-safe but app is not concurrent).
+- Header guard style: `_FILENAME_H_` (double underscore prefix/suffix).
+- Source copied from [live_server](https://github.com/pritam12426/live_server)
+  (`server.c`, `http.c`, `response.c`, `transport.c`, `auth.c`, `thread_pool.c`,
+  `ratelimit.c`, `mime.c`) — adapted to serve embedded VFS files instead of
+  real filesystem files. `DEV.md` documents the original architecture.

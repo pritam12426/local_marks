@@ -30,13 +30,12 @@
 	--radius-xs:   4px;
 	--sidebar-w:   230px;
 	--header-h:    112px;
-	--font-ui:     'Segoe UI', system-ui, -apple-system, sans-serif;
+	--font-ui:     'Segoe UI', system-ui, -apple-system, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
 	--font-mono:   'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 	--transition:  0.15s ease;
 }
 
 html {
-	scroll-behavior: smooth;
 }
 
 body {
@@ -280,6 +279,50 @@ a {
 	padding:    6px 8px;
 }
 
+/* ── SIDEBAR RESIZER ── */
+
+.sidebar-resizer {
+	flex-shrink: 0;
+	width:       7px;
+	margin-left: -4px;
+	position:    relative;
+	cursor:      col-resize;
+	z-index:     5;
+	touch-action: none;
+}
+
+.sidebar-resizer::after {
+	content:    '';
+	position:   absolute;
+	top:        0;
+	bottom:     0;
+	left:       50%;
+	width:      3px;
+	background: var(--accent);
+	opacity:    0;
+	transition: opacity var(--transition);
+	transform:  translateX(-50%);
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer.dragging::after {
+	opacity: 1;
+}
+
+.sidebar-resizer:focus-visible {
+	outline: none;
+}
+
+body.sidebar-resizing {
+	cursor:      col-resize !important;
+	user-select: none;
+}
+
+body.sidebar-resizing .sidebar,
+body.sidebar-resizing .main-panel {
+	transition: none;
+}
+
 .category-list li {
 	display:         flex;
 	align-items:     center;
@@ -503,7 +546,147 @@ a {
 	border-color: var(--border2);
 }
 
-/* ── Star button on card ── */
+.bookmark-card:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px var(--accent-glow);
+}
+
+.bookmark-card.focused {
+	background:   var(--accent-dim);
+	border-color: var(--accent);
+	box-shadow:   0 0 0 2px var(--accent-glow);
+}
+
+/* ── Keyboard focus for sidebar items ── */
+
+.category-list li:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px var(--accent-glow);
+}
+
+/* ── Floating modal (keyboard help, etc.) ── */
+
+.modal-overlay {
+	position:        fixed;
+	inset:           0;
+	display:         flex;
+	align-items:     center;
+	justify-content: center;
+	background:      rgba(0, 0, 0, 0.55);
+	backdrop-filter: blur(3px);
+	opacity:         0;
+	pointer-events:  none;
+	transition:      opacity var(--transition);
+	z-index:         999;
+	padding:         24px;
+}
+
+.modal-overlay.open {
+	opacity:        1;
+	pointer-events: auto;
+}
+
+.modal-box {
+	position:      relative;
+	background:    var(--surface);
+	border:        1px solid var(--border);
+	border-radius: 18px;
+	box-shadow:    0 24px 60px rgba(0, 0, 0, 0.45);
+	max-width:     460px;
+	width:         100%;
+	max-height:    80vh;
+	overflow-y:    auto;
+	transform:     scale(0.94) translateY(10px);
+	transition:    transform var(--transition);
+}
+
+.modal-overlay.open .modal-box {
+	transform: scale(1) translateY(0);
+}
+
+.modal-close {
+	position:      absolute;
+	top:           12px;
+	right:         12px;
+	width:         28px;
+	height:        28px;
+	display:       flex;
+	align-items:   center;
+	justify-content: center;
+	background:    var(--surface2);
+	border:        1px solid var(--border);
+	border-radius: 50%;
+	color:         var(--muted);
+	font-size:     13px;
+	cursor:        pointer;
+	transition:    background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.modal-close:hover {
+	background:   var(--surface3);
+	color:        var(--text);
+	border-color: var(--border2);
+}
+
+.modal-close:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px var(--accent-glow);
+}
+
+/* ── Keyboard help modal ── */
+
+.keyboard-help {
+	max-width: 500px;
+	margin: 0 auto;
+	padding: 20px;
+}
+
+.keyboard-help h3 {
+	font-size: 18px;
+	font-weight: 700;
+	color: var(--accent);
+	margin-bottom: 16px;
+	text-align: center;
+}
+
+.keyboard-help table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.keyboard-help td {
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--border);
+}
+
+.keyboard-help td:first-child {
+	width: 30%;
+	color: var(--text);
+	font-family: var(--font-mono);
+	background: var(--surface2);
+	border-radius: var(--radius-xs);
+	padding: 6px 10px;
+	text-align: center;
+}
+
+.keyboard-help td:last-child {
+	color: var(--muted);
+	padding-left: 16px;
+}
+
+.keyboard-help kbd {
+	background: var(--surface3);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-xs);
+	padding: 2px 6px;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	color: var(--accent);
+	box-shadow: 0 1px 0 var(--border2);
+}
+
+.keyboard-help tr:last-child td { border-bottom: none; }
 
 .bm-star {
 	font-size:     14px;
@@ -1000,6 +1183,173 @@ a {
 
 .domain-card:hover .domain-card-hint { opacity: 1; }
 
+/* ── Link health check ── */
+
+.health-controls {
+	display:      flex;
+	align-items:  center;
+	gap:          10px;
+	flex-wrap:    wrap;
+	margin-bottom: 16px;
+}
+
+.health-btn {
+	font-size:     12px;
+	font-weight:   600;
+	border-radius: var(--radius-sm);
+	padding:       8px 16px;
+	cursor:        pointer;
+	transition:    background var(--transition), border-color var(--transition), color var(--transition), opacity var(--transition);
+}
+
+.health-btn.primary {
+	color:      var(--bg);
+	background: var(--accent);
+	border:     1px solid var(--accent);
+}
+
+.health-btn.primary:hover  { opacity: 0.85; }
+.health-btn.primary:disabled {
+	opacity: 0.5;
+	cursor:  not-allowed;
+}
+
+.health-btn.secondary {
+	color:      var(--muted);
+	background: var(--surface2);
+	border:     1px solid var(--border);
+}
+
+.health-btn.secondary:hover {
+	color:        var(--text);
+	border-color: var(--border2);
+}
+
+.health-progress {
+	display:     flex;
+	align-items: center;
+	gap:         10px;
+	flex:        1;
+	min-width:   160px;
+}
+
+.health-progress-bar {
+	flex:          1;
+	height:        6px;
+	background:    var(--surface2);
+	border-radius: 99px;
+	overflow:      hidden;
+}
+
+.health-progress-fill {
+	height:        100%;
+	background:    var(--accent);
+	border-radius: 99px;
+	transition:    width 0.2s ease;
+}
+
+.health-progress-text {
+	font-size:   11px;
+	font-family: var(--font-mono);
+	color:       var(--muted);
+	white-space: nowrap;
+}
+
+.health-summary { margin-bottom: 16px; }
+
+.health-stats {
+	display:   flex;
+	flex-wrap: wrap;
+	gap:       8px;
+}
+
+.health-stat {
+	font-size:     12px;
+	font-weight:   600;
+	padding:       5px 12px;
+	border-radius: 99px;
+	background:    var(--surface2);
+	border:        1px solid var(--border);
+	color:         var(--muted);
+}
+
+.health-stat.ok            { color: #4ade80; border-color: rgba(74, 222, 128, 0.35);  background: rgba(74, 222, 128, 0.1); }
+.health-stat.reachable     { color: #a78bfa; border-color: rgba(167, 139, 250, 0.35); background: rgba(167, 139, 250, 0.1); }
+.health-stat.redirect      { color: #60a5fa; border-color: rgba(96, 165, 250, 0.35);  background: rgba(96, 165, 250, 0.1); }
+.health-stat.client-error  { color: #fbbf24; border-color: rgba(251, 191, 36, 0.35);  background: rgba(251, 191, 36, 0.1); }
+.health-stat.server-error  { color: #f87171; border-color: rgba(248, 113, 113, 0.35); background: rgba(248, 113, 113, 0.1); }
+.health-stat.error         { color: #f87171; border-color: rgba(248, 113, 113, 0.35); background: rgba(248, 113, 113, 0.1); }
+.health-stat.total         { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-glow); }
+
+.health-details { overflow-x: auto; }
+
+.health-table {
+	width:           100%;
+	border-collapse: collapse;
+	font-size:       12px;
+}
+
+.health-table th {
+	text-align:     left;
+	padding:        8px 10px;
+	color:          var(--muted);
+	font-size:      10px;
+	font-weight:    700;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+	border-bottom:  1px solid var(--border);
+	white-space:    nowrap;
+}
+
+.health-table td {
+	padding:       8px 10px;
+	border-bottom: 1px solid var(--border);
+	vertical-align: top;
+}
+
+.health-table td:first-child { white-space: nowrap; }
+
+.health-table a {
+	color:           var(--accent);
+	word-break:      break-all;
+}
+
+.health-table a:hover { text-decoration: underline; }
+
+.health-row.ok            td:first-child { color: #4ade80; }
+.health-row.reachable     td:first-child { color: #a78bfa; }
+.health-row.redirect      td:first-child { color: #60a5fa; }
+.health-row.client-error  td:first-child { color: #fbbf24; }
+.health-row.server-error  td:first-child { color: #f87171; }
+.health-row.error         td:first-child { color: #f87171; }
+.health-row.cancelled     td:first-child { color: var(--muted); }
+
+/* ── Keyboard-shortcut toast (yy copy, etc.) ── */
+
+.kb-toast {
+	position:      fixed;
+	left:          50%;
+	bottom:        32px;
+	transform:     translateX(-50%) translateY(12px);
+	background:    var(--surface3);
+	color:         var(--text);
+	border:        1px solid var(--border2);
+	border-radius: 99px;
+	padding:       9px 18px;
+	font-size:     12px;
+	font-weight:   600;
+	box-shadow:    0 12px 30px rgba(0, 0, 0, 0.35);
+	opacity:       0;
+	pointer-events: none;
+	transition:    opacity var(--transition), transform var(--transition);
+	z-index:       1000;
+}
+
+.kb-toast.show {
+	opacity:   1;
+	transform: translateX(-50%) translateY(0);
+}
+
 /* =============================================
    RESPONSIVE
    ============================================= */
@@ -1044,6 +1394,10 @@ a {
 		border-right:  none;
 		border-bottom: 1px solid var(--border);
 		max-height:    48px;
+	}
+
+	.sidebar-resizer {
+		display: none;
 	}
 
 	.sidebar-heading {
@@ -1200,4 +1554,116 @@ a {
 		transition: none !important;
 		animation:  none !important;
 	}
+}
+
+/* ── Theme Toggle Button ── */
+.theme-toggle {
+	font-size: 14px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 20px;
+	padding: 5px 10px;
+	cursor: pointer;
+	color: var(--muted);
+	transition: color var(--transition), border-color var(--transition);
+	margin-left: 8px;
+}
+
+.theme-toggle:hover {
+	color: var(--accent);
+	border-color: var(--accent);
+}
+
+/* ── Theme via data-theme attribute (for manual toggle) ── */
+:root[data-theme="light"] {
+	--bg:        #f5f5f7;
+	--surface:   #ffffff;
+	--surface2:  #eeeeef;
+	--surface3:  #e4e4e7;
+	--border:    #d4d4d8;
+	--border2:   #b4b4b9;
+	--text:      #1c1c1e;
+	--muted:     #6b6b72;
+	--muted2:    #8e8e96;
+	--accent:     #2563eb;
+	--accent-dim: #bfdbfe;
+	--accent-glow: rgba(37, 99, 235, 0.1);
+	--tag-bg:    #e8e8ec;
+}
+
+/* ── Focus Styles ── */
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.bookmark-card:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: var(--radius-sm);
+}
+
+.category-list li:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+	border-radius: var(--radius-sm);
+}
+
+#search-input:focus-visible {
+	outline: none;
+}
+
+.tag-pill:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 99px;
+}
+
+.layout-btn:focus-visible,
+.info-btn:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+	border-radius: 16px;
+}
+
+/* These containers get tabindex="-1" + a programmatic .focus() purely so
+   keyboard/screen-reader users land somewhere sensible after a route
+   change — they're not meant to show a visible ring around the whole
+   page every time you refresh or switch views. */
+#main-panel:focus-visible,
+.info-body:focus-visible,
+.random-body:focus-visible {
+	outline: none;
+}
+
+/* ── Favicon Lazy Loading ── */
+.bm-favicon[data-lazy] {
+	opacity: 0;
+	transition: opacity 0.2s;
+}
+
+.bm-favicon.loaded {
+	opacity: 1;
+}
+
+/* ── Improved Empty States ── */
+.state-empty {
+	position: relative;
+}
+
+.state-empty .state-action {
+	margin-top: 12px;
+	font-size: 13px;
+	color: var(--accent);
+	background: var(--accent-dim);
+	border: 1px solid var(--accent);
+	border-radius: var(--radius-sm);
+	padding: 8px 16px;
+	cursor: pointer;
+	transition: background var(--transition), color var(--transition);
+}
+
+.state-empty .state-action:hover {
+	background: var(--accent);
+	color: var(--surface);
 }

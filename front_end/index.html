@@ -22,19 +22,20 @@
 
 			<div class="header-right">
 				<div class="layout-toggle" id="layout-toggle" title="Layout">
-					<button class="layout-btn active" data-layout="single">☰</button>
-					<button class="layout-btn" data-layout="grid">▦</button>
-					<button class="layout-btn" data-layout="compact">≡</button>
+					<button class="layout-btn active" data-layout="single" aria-label="Single column">☰</button>
+					<button class="layout-btn" data-layout="grid" aria-label="Two-column grid">▦</button>
+					<button class="layout-btn" data-layout="compact" aria-label="Compact list">≡</button>
 				</div>
-				<a href="#info" class="info-btn">📊 Info</a>
-				<a href="#random" class="info-btn">🎲 Random</a>
+				<button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light theme">🌙</button>
+				<a href="#info" class="info-btn" aria-label="Database info">📊 Info</a>
+				<a href="#random" class="info-btn" aria-label="Random links">🎲 Random</a>
 			</div>
 		</div>
 
 		<div class="search-wrap" id="search-wrap">
 			<span class="search-icon">🔍</span>
 			<input type="text" id="search-input"
-				placeholder="Search bookmarks… (title, description, tags, url)	 Ctrl + K"
+				placeholder="Search bookmarks… (title, description, tags, url)"
 				autocomplete="off" spellcheck="false">
 			<button id="clear-search" class="clear-btn" title="Clear search">✕</button>
 		</div>
@@ -49,14 +50,15 @@
 					<span>Categories</span>
 					<span class="sidebar-count" id="sidebar-count"></span>
 				</div>
-				<ul class="category-list" id="category-list"></ul>
+				<ul class="category-list" id="category-list" role="listbox" aria-label="Categories"></ul>
 			</aside>
-			<main class="main-panel" id="main-panel">
+			<div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" title="Drag to resize · double-click to reset"></div>
+			<main class="main-panel" id="main-panel" role="main">
 				<div class="panel-top" id="panel-top">
 					<div class="panel-title" id="panel-title">Loading…</div>
-					<div class="tag-bar" id="tag-bar"></div>
+					<div class="tag-bar" id="tag-bar" role="group" aria-label="Tag filters"></div>
 				</div>
-				<div class="bookmark-list" id="bookmark-list"></div>
+				<div class="bookmark-list" id="bookmark-list" role="list" aria-label="Bookmarks"></div>
 			</main>
 		</div>
 	</section>
@@ -100,6 +102,7 @@
 				<h2 class="section-title">Domains <span id="domain-count-label" class="section-count"></span></h2>
 				<div class="domain-grid" id="domain-grid"></div>
 			</section>
+			<div id="health-check"></div>
 		</div>
 	</section>
 

@@ -8,7 +8,7 @@
 
 /* ---- The one knob: set this to (at least) how many files you embed. ----
  * Everything else below derives from it automatically. */
-#define VFS_MAX_FILES 10
+#define VFS_MAX_FILES 20
 
 /* Rounds x up to the next power of two, as a compile-time constant
  * expression (standard bit-smearing trick — no compiler-specific

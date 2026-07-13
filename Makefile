@@ -29,15 +29,22 @@ HEADERS   = $(wildcard src/*.h)
 SRC      := $(wildcard src/*.c)
 
 FRONT_END_FILES = \
-    front_end/favicon.ico \
-    front_end/index.html \
+    front_end/javascript/browse.js \
+    front_end/javascript/data.js \
+    front_end/javascript/health.js \
+    front_end/javascript/info.js \
+    front_end/javascript/keyboard.js \
+    front_end/javascript/main.js \
+    front_end/javascript/panel.js \
+    front_end/javascript/random.js \
+    front_end/javascript/search.js \
+    front_end/javascript/sidebar.js \
+    front_end/javascript/tag_bar.js \
     front_end/stylesheet/style.css \
     front_end/stylesheet/themes/light.css \
-    front_end/javascript/random.js \
-    front_end/javascript/browse.js \
-    front_end/javascript/info.js \
-    front_end/javascript/main.js \
-    front_end/javascript/data.js
+    front_end/favicon.ico \
+    front_end/index.html \
+    front_end/sw.js
 
 FRONT_END_SCRIPT       = front_end/embed_frontend.bash
 FRONT_END_GENERATED_C  = $(BUILD)/gen_embedded_front_end_dir.c
@@ -51,7 +58,7 @@ CFLAGS +=  -Wall -Wextra -Wpedantic \
            -Wno-missing-field-initializers
 
 # Common flags
-CFLAGS += -Isrc -std=c17 -DLOG_SHOW_TIME_STAMP -DLOG_SHOW_SOURCE_LOCATION
+CFLAGS += -Isrc -std=c17 -DLOG_SHOW_TIME_STAMP
 LDLIBS +=  -lpthread
 
 # Convert targets to flags for backwards compatibility
