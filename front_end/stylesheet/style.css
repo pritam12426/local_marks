@@ -1183,147 +1183,6 @@ body.sidebar-resizing .main-panel {
 
 .domain-card:hover .domain-card-hint { opacity: 1; }
 
-/* ── Link health check ── */
-
-.health-controls {
-	display:      flex;
-	align-items:  center;
-	gap:          10px;
-	flex-wrap:    wrap;
-	margin-bottom: 16px;
-}
-
-.health-btn {
-	font-size:     12px;
-	font-weight:   600;
-	border-radius: var(--radius-sm);
-	padding:       8px 16px;
-	cursor:        pointer;
-	transition:    background var(--transition), border-color var(--transition), color var(--transition), opacity var(--transition);
-}
-
-.health-btn.primary {
-	color:      var(--bg);
-	background: var(--accent);
-	border:     1px solid var(--accent);
-}
-
-.health-btn.primary:hover  { opacity: 0.85; }
-.health-btn.primary:disabled {
-	opacity: 0.5;
-	cursor:  not-allowed;
-}
-
-.health-btn.secondary {
-	color:      var(--muted);
-	background: var(--surface2);
-	border:     1px solid var(--border);
-}
-
-.health-btn.secondary:hover {
-	color:        var(--text);
-	border-color: var(--border2);
-}
-
-.health-progress {
-	display:     flex;
-	align-items: center;
-	gap:         10px;
-	flex:        1;
-	min-width:   160px;
-}
-
-.health-progress-bar {
-	flex:          1;
-	height:        6px;
-	background:    var(--surface2);
-	border-radius: 99px;
-	overflow:      hidden;
-}
-
-.health-progress-fill {
-	height:        100%;
-	background:    var(--accent);
-	border-radius: 99px;
-	transition:    width 0.2s ease;
-}
-
-.health-progress-text {
-	font-size:   11px;
-	font-family: var(--font-mono);
-	color:       var(--muted);
-	white-space: nowrap;
-}
-
-.health-summary { margin-bottom: 16px; }
-
-.health-stats {
-	display:   flex;
-	flex-wrap: wrap;
-	gap:       8px;
-}
-
-.health-stat {
-	font-size:     12px;
-	font-weight:   600;
-	padding:       5px 12px;
-	border-radius: 99px;
-	background:    var(--surface2);
-	border:        1px solid var(--border);
-	color:         var(--muted);
-}
-
-.health-stat.ok            { color: #4ade80; border-color: rgba(74, 222, 128, 0.35);  background: rgba(74, 222, 128, 0.1); }
-.health-stat.reachable     { color: #a78bfa; border-color: rgba(167, 139, 250, 0.35); background: rgba(167, 139, 250, 0.1); }
-.health-stat.redirect      { color: #60a5fa; border-color: rgba(96, 165, 250, 0.35);  background: rgba(96, 165, 250, 0.1); }
-.health-stat.client-error  { color: #fbbf24; border-color: rgba(251, 191, 36, 0.35);  background: rgba(251, 191, 36, 0.1); }
-.health-stat.server-error  { color: #f87171; border-color: rgba(248, 113, 113, 0.35); background: rgba(248, 113, 113, 0.1); }
-.health-stat.error         { color: #f87171; border-color: rgba(248, 113, 113, 0.35); background: rgba(248, 113, 113, 0.1); }
-.health-stat.total         { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-glow); }
-
-.health-details { overflow-x: auto; }
-
-.health-table {
-	width:           100%;
-	border-collapse: collapse;
-	font-size:       12px;
-}
-
-.health-table th {
-	text-align:     left;
-	padding:        8px 10px;
-	color:          var(--muted);
-	font-size:      10px;
-	font-weight:    700;
-	text-transform: uppercase;
-	letter-spacing: 0.6px;
-	border-bottom:  1px solid var(--border);
-	white-space:    nowrap;
-}
-
-.health-table td {
-	padding:       8px 10px;
-	border-bottom: 1px solid var(--border);
-	vertical-align: top;
-}
-
-.health-table td:first-child { white-space: nowrap; }
-
-.health-table a {
-	color:           var(--accent);
-	word-break:      break-all;
-}
-
-.health-table a:hover { text-decoration: underline; }
-
-.health-row.ok            td:first-child { color: #4ade80; }
-.health-row.reachable     td:first-child { color: #a78bfa; }
-.health-row.redirect      td:first-child { color: #60a5fa; }
-.health-row.client-error  td:first-child { color: #fbbf24; }
-.health-row.server-error  td:first-child { color: #f87171; }
-.health-row.error         td:first-child { color: #f87171; }
-.health-row.cancelled     td:first-child { color: var(--muted); }
-
 /* ── Keyboard-shortcut toast (yy copy, etc.) ── */
 
 .kb-toast {
@@ -1572,6 +1431,42 @@ body.sidebar-resizing .main-panel {
 .theme-toggle:hover {
 	color: var(--accent);
 	border-color: var(--accent);
+}
+
+/* ── Database Selector ── */
+.db-selector {
+	display: flex;
+	align-items: center;
+	margin-left: 8px;
+}
+
+#db-select {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 20px;
+	padding: 5px 12px;
+	color: var(--text);
+	font-size: 12px;
+	font-family: var(--font-ui);
+	cursor: pointer;
+	transition: border-color var(--transition), box-shadow var(--transition);
+	min-width: 160px;
+}
+
+#db-select:focus {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+#db-select:hover {
+	border-color: var(--border2);
+}
+
+@media (max-width: 768px) {
+	.db-selector {
+		display: none;
+	}
 }
 
 /* ── Theme via data-theme attribute (for manual toggle) ── */

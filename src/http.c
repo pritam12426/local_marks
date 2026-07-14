@@ -3,13 +3,13 @@
  *
  * Parses the request line + headers from a Transport into an HttpRequest,
  * and provides utility functions for status/redirect responses.
+ * Optimized for in-place parsing to minimize memory copies.
  */
 
 #include "http.h"
 
 #include <ctype.h>
 #include <errno.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +35,7 @@ static char *str_trim(char *s)
 	return s;
 }
 
-// Decode percent-encoded URL into dst (e.g. %20 → space, + → space)
+// Decode percent-encoded URL into dst (e.g. %20 -> space, + -> space)
 void http_url_decode(char *dst, size_t dst_size, const char *src)
 {
 	size_t di = 0;
@@ -62,7 +62,6 @@ static ssize_t read_headers(Transport *t, char *buf, size_t max)
 	size_t n  = 0;
 
 	while (n + 1 < max) {
-		// Read in chunks to minimize syscalls; leave room for partial match
 		size_t want = max - n;
 		if (want > 4096) want = 4096;
 		ssize_t rc = transport_read(t, buf + n, want);
@@ -85,13 +84,18 @@ static ssize_t read_headers(Transport *t, char *buf, size_t max)
 }
 
 // Parse the first line of an HTTP request (e.g. "GET /path HTTP/1.1")
-// Works on raw[] directly (modifies it in place).
 // Returns 0 on success, -1 on malformed input
 static int parse_request_line(char *line, HttpRequest *r)
 {
 	char *sp1 = strchr(line, ' ');
 	if (!sp1) return -1;
 	*sp1 = '\0';
+
+	// Store the raw method string (log what the client actually sent)
+	snprintf(r->method_str, sizeof(r->method_str), "%s", line);
+	// Uppercase it so logging is consistent
+	for (char *p = r->method_str; *p; p++)
+		*p = (char)(*p >= 'a' && *p <= 'z' ? *p - 32 : *p);
 
 	// Method
 	if      (strcmp(line, "GET")  == 0) r->method = HTTP_GET;
@@ -107,18 +111,24 @@ static int parse_request_line(char *line, HttpRequest *r)
 	*sp2 = '\0';
 
 	// Version
-	char *ver = sp2 + 1;
-	char *cr = strchr(ver, '\r');
+	snprintf(r->version, sizeof(r->version), "%s", sp2 + 1);
+	char *cr = strchr(r->version, '\r');
 	if (cr) *cr = '\0';
-	snprintf(r->version, sizeof(r->version), "%s", ver);
 
-	// URL-decode the path (query string is discarded — not used)
+	// Split URI into path and query string
 	char *q = strchr(uri, '?');
-	if (q) *q = '\0';
+	if (q) {
+		*q = '\0';
+		snprintf(r->query, sizeof(r->query), "%s", q + 1);
+	} else {
+		r->query[0] = '\0';
+	}
+
+	// URL-decode the path
 	http_url_decode(r->path, sizeof(r->path), uri);
 
-	LOG_DEBUG("Request line: %s %s %s",
-	          http_method_str(r->method), r->path, r->version);
+	LOG_DEBUG("Request line: %s %s -> %s (qs=%s) %s",
+	          http_method_str(r->method), uri, r->path, r->query, r->version);
 
 	// Basic path-traversal check at parse time (defence-in-depth)
 	if (strstr(r->path, "..")) {
@@ -130,7 +140,7 @@ static int parse_request_line(char *line, HttpRequest *r)
 }
 
 // Parse a single header line into the HttpRequest struct
-// Works on raw[] directly (modifies it in place).
+// (e.g. "If-None-Match: ..." -> r->if_none_match)
 static void parse_header(char *line, HttpRequest *r)
 {
 	char *colon = strchr(line, ':');
@@ -141,11 +151,13 @@ static void parse_header(char *line, HttpRequest *r)
 	char *value = str_trim(colon + 1);
 
 	// Normalise header name to lowercase for matching
-	char lname[64];
+	char lname[256];
 	snprintf(lname, sizeof(lname), "%s", name);
 	str_lower(lname);
 
-	if (strcmp(lname, "authorization") == 0) {
+	if (strcmp(lname, "host") == 0) {
+		snprintf(r->host, sizeof(r->host), "%s", value);
+	} else if (strcmp(lname, "authorization") == 0) {
 		LOG_DEBUG("Header: Authorization: Basic ****");
 		snprintf(r->auth, sizeof(r->auth), "%s", value);
 	} else if (strcmp(lname, "connection") == 0) {
@@ -154,6 +166,9 @@ static void parse_header(char *line, HttpRequest *r)
 	} else if (strcmp(lname, "if-none-match") == 0) {
 		LOG_DEBUG("Header: If-None-Match: %s", value);
 		snprintf(r->if_none_match, sizeof(r->if_none_match), "%s", value);
+	} else if (strcmp(lname, "if-modified-since") == 0) {
+		LOG_DEBUG("Header: If-Modified-Since: %s", value);
+		snprintf(r->if_modified_since, sizeof(r->if_modified_since), "%s", value);
 	} else if (strcmp(lname, "range") == 0) {
 		// Parse "bytes=start-end" — supports both "bytes=N-" and "bytes=N-M"
 		if (strncmp(value, "bytes=", 6) == 0) {
@@ -163,7 +178,10 @@ static void parse_header(char *line, HttpRequest *r)
 				r->range_start = strtoll(value + 6, NULL, 10);
 				if (errno != 0)
 					r->range_start = -1;
-				if (dash != value + 6) {
+				if (dash == value + 6) {
+					// "bytes=-N" -> suffix range (last N bytes)
+					// range_start is already set to -N by strtoll above
+				} else {
 					r->range_end = (*(dash + 1) != '\0')
 								   ? strtoll(dash + 1, NULL, 10)
 								   : -1;
@@ -177,8 +195,7 @@ static void parse_header(char *line, HttpRequest *r)
 	}
 }
 
-// Parse the full HTTP request (request line + headers) from a transport.
-// Parses raw[] in-place — no secondary buffer copy.
+// Parse the full HTTP request (request line + headers) from a transport
 // Returns 0 on success, -1 on failure
 int http_parse_request(Transport *t, HttpRequest *out)
 {
@@ -205,18 +222,20 @@ int http_parse_request(Transport *t, HttpRequest *out)
 		else       { next = line + strlen(line); }
 
 		if (first) {
+			// First line is the request line (method, URI, version)
 			if (parse_request_line(line, out) != 0) {
 				LOG_WARN("Bad request line on fd=%d: %s", transport_fd(t), line);
 				return -1;
 			}
 			first = false;
 		} else if (*line != '\0') {
+			// Subsequent lines are headers
 			parse_header(line, out);
 		}
 		line = next;
 	}
 	LOG_DEBUG("Parsed request: %s %s %s (fd=%d)",
-			  http_method_str(out->method), out->path, out->version, transport_fd(t));
+	          http_method_str(out->method), out->path, out->version, transport_fd(t));
 	return 0;
 }
 
@@ -261,7 +280,7 @@ void http_send_status(Transport *t, int code, const char *reason, const char *bo
 		"Connection: close\r\n"
 		"\r\n",
 		code, reason, body_len);
-	if ((size_t)n > sizeof(buf)) n = (int)sizeof(buf);
+	if ((size_t)n > sizeof(buf)) n = (int)sizeof(buf) - 1;
 	transport_write(t, buf, (size_t)n);
 	if (body && body_len)
 		transport_write(t, body, body_len);
@@ -278,6 +297,6 @@ void http_send_redirect(Transport *t, const char *location)
 		"Connection: close\r\n"
 		"\r\n",
 		location);
-	if ((size_t)n > sizeof(buf)) n = (int)sizeof(buf);
+	if ((size_t)n > sizeof(buf)) n = (int)sizeof(buf) - 1;
 	transport_write(t, buf, (size_t)n);
 }

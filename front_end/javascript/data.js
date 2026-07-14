@@ -73,6 +73,45 @@ export async function fetchBookmarks()
 	}
 }
 
+// ── Multi-database support ───────────────────
+
+export async function fetchDatabases()
+{
+	try {
+		const res = await fetch('/api/databases', {cache: 'no-cache'});
+		if (!res.ok)
+			throw new Error(`HTTP ${res.status}`);
+		return await res.json();
+	} catch (err) {
+		console.error('❌ Failed to fetch database list:', err);
+		return {databases: [], count: 0};
+	}
+}
+
+export async function fetchBookmarksByIndex(index)
+{
+	try {
+		const res = await fetch(`/bookmarks/${index}.json`, {cache: 'no-cache'});
+		if (!res.ok)
+			throw new Error(`HTTP ${res.status}`);
+		const data = await res.json();
+		setCache(data);
+		return data;
+	} catch (err) {
+		const cached = await getCached();
+		if (cached) {
+			console.warn('⚠️ Network fetch failed, using cached bookmarks:', err.message);
+			return cached;
+		}
+		throw err;
+	}
+}
+
+export async function switchDatabase(index)
+{
+	return fetchBookmarksByIndex(index);
+}
+
 // ── HTML escape ────────────────────────────
 
 export function esc(str)

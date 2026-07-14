@@ -9,6 +9,10 @@
 
 Turn pipe-delimited bookmark files into a searchable, categorized local web UI. A single C17 binary serves a static frontend with tag/domain filters, no network required — just a browser.
 
+<img src="./assets/home_page.png" alt="LocalMarks home page" width="100%">
+
+---
+
 ## Table of Contents
 
 - [How it works](#how-it-works)
@@ -215,10 +219,10 @@ update  FILE... -T DB [-O]      Append/override into existing database
 | `FILE`        |       | required        | Bookmark JSON file(s)             |
 | `--port`      | `-P`  | `8080`          | TCP port                          |
 | `--host`      | `-H`  | `localhost`     | Listener address                  |
-| `--user`      | `-u`  | —              | Basic auth username               |
-| `--pass`      | `-p`  | —              | Basic auth password               |
+| `--user`      | `-u`  | —               | Basic auth username               |
+| `--pass`      | `-p`  | —               | Basic auth password               |
 | `--max-conns` | `-M`  | `0` (unlimited) | Max concurrent connections per IP |
-| `--browser`   | `-B`  | —              | Open browser on startup           |
+| `--browser`   | `-B`  | —               | Open browser on startup           |
 | `--log-level` | `-L`  | `info`          | `error`, `warn`, `info`, `debug`  |
 | `--log-file`  | `-F`  | stderr          | Append logs to file               |
 
@@ -247,34 +251,80 @@ No CMake — pure Makefile. Objects go to `build/`.
 
 ## Features
 
-**Bookmark browser (`#browse`)**
+### Bookmark browser (`#browse`)
 
-- Sidebar with categories and bookmark counts per category
-- Full-text search across title, description, tags, and URL (`Ctrl+K` / `Cmd+K` to focus)
-- Tag filter bar per category — multi-select tag pills
-- Click a tag on any bookmark card to instantly filter
-- Collapsible tag bar (auto-folds past 30 tags)
-- Duplicate URLs deduplicated within each category
-- Favorites view (⭐ star bookmarks, stored in localStorage)
-- Three layouts: single-column, grid, compact
+<img src="./assets/home_page.png" alt="LocalMarks home page" width="100%">
 
-**Database info (`#info`)**
+- Sidebar with all categories and bookmark counts
+- **Favorites** virtual category (★) appears at top when any bookmark is starred
+- Full-text search across title, description, tags, and URL — press `/` to focus
+- Tag filter bar per category — click any tag pill to filter, multi-select supported
+- Click a tag directly on a bookmark card to instantly add it to the filter
+- Collapsible tag bar — automatically folds when a category has **more than 30 tags**, shows active filter count while folded
+- Duplicate URLs are silently deduplicated within each category
+- Favicons loaded via Google's favicon service, with fallback chain for YouTube thumbnails
+- **Layout toggle** (header): single column / two-column grid / compact list — persisted
+- **Sidebar resizer**: drag handle to resize (160–480px), double-click to reset — persisted
 
-- Total bookmarks, unique URLs, categories, domains, and tags
+### Database info view (`#info`)
+
+<img src="./assets/info_page.png" alt="LocalMarks info page" width="100%">
+
+- Total bookmarks, unique URLs, categories, domains, and tags at a glance
 - Per-category bar chart
-- Tag cloud sorted by frequency
-- Domain grid with favicon and count — click any domain to search
+- Tag cloud sorted by frequency (sourced from `book_mark_tag_hash`) — collapses at **>35 tags** with expand toggle
+- Domain grid with favicon and count — click any domain card to jump to filtered search (`#browse?q=domain`)
+- **Link health check**: click "🔍 Check All Links" to run async HEAD requests with progress bar; results table shows OK (2xx), Redirect (3xx), Client Error (4xx), Server Error (5xx), Network Error — cancellable, configurable concurrency
 
-**Random picker (`#random`)**
+### Random view (`#random`)
 
-- Pick N random bookmarks from all / a category / matching a tag
-- Tag autocomplete from database
-- "Open all" opens each result in a new tab
+<img src="./assets/random_page.png" alt="LocalMarks info page" width="100%">
 
-**Performance**
+- Pick N random bookmarks with optional category/tag filters
+- "Open All" opens picks with 150ms staggered delays
+- Shows count of matches in current filter pool
 
-- IndexedDB cache — loads instantly on repeat visits, background-refreshes
-- No framework, no dependencies at runtime
+### Theme system
+
+- **Dark** (default, in `style.css`) and **Light** (`stylesheet/themes/light.css`)
+- Light theme activates automatically via `prefers-color-scheme: light` media query — no JavaScript needed
+- Manual toggle in header (☀️/🌙) persists choice to `localStorage` (`localmarks-theme`), overriding system preference
+
+### Persistence (localStorage)
+
+| Key                    | Purpose                                      |
+| ---------------------- | -------------------------------------------- |
+| `localmarks-favorites` | Array of starred bookmark URLs               |
+| `localmarks-layout`    | Layout mode: `single` \| `grid` \| `compact` |
+| `localmarks-sidebar-w` | Sidebar width in pixels                      |
+| `localmarks-theme`     | `dark` \| `light` (overrides system)         |
+
+### IndexedDB cache
+
+`bookmarks.json` is cached in IndexedDB (`LocalMarksCache`). On load, stale cache returns immediately; fresh fetch happens in background. Clear browser storage or run `indexedDB.deleteDatabase('LocalMarksCache')` in DevTools to force reload.
+
+---
+
+## Keyboard shortcuts
+
+| Key             | Action                                     |
+| --------------- | ------------------------------------------ |
+| `j` / `↓`       | Next bookmark                              |
+| `k` / `↑`       | Previous bookmark                          |
+| `h` / `←`       | Back to categories (sidebar)               |
+| `l` / `→`       | Into bookmarks (cards)                     |
+| `gg`            | Jump to first bookmark                     |
+| `G` (`Shift+G`) | Jump to last bookmark                      |
+| `/`             | Focus search (global)                      |
+| `Enter`         | Open focused bookmark (new tab)            |
+| `o`             | Open focused bookmark (same tab)           |
+| `yy`            | Copy URL to clipboard (shows domain toast) |
+| `p`             | Pin/unpin bookmark                         |
+| `Esc`           | Clear search / close help                  |
+| `?`             | Toggle help modal                          |
+| `Ctrl/Cmd+K`    | Focus search                               |
+
+> Vim-style navigation only works in the **Browse** view (`#browse`).
 
 ---
 

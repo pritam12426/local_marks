@@ -2,6 +2,7 @@
 #define _DATABASES_META_H_
 
 
+#include <limits.h>
 #include <stddef.h>
 #include <sys/stat.h>
 
@@ -11,14 +12,14 @@
 // Database metadata structure
 typedef struct {
 	mode_t      mode;
-	const char *absolute_path;
+	char        absolute_path[PATH_MAX];
 	char        file_name[256];
 	size_t      file_size;  // bytes on disk
 	// Optional: filesystem extras
 	time_t      cTime;  // inode change time (metadata changes)
 	time_t      bTime;  // birth/creation time (where supported)
-	uid_t       uid;    // file owner
-	gid_t       gid;    // file group
+	char        user[256];   // file owner name
+	char        group[256];  // file group name
 	struct timespec mTime;  // modification time
 } JSON_DB_meta_data;
 

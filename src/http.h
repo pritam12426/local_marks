@@ -12,28 +12,34 @@
 typedef struct Transport Transport;
 
 // HTTP methods we can handle
-// TODO: add (POST, PUT, etc.)
+// TODO: think about add (POST, PUT, etc.) !!
 typedef enum {
 	HTTP_GET  = 0,
 	HTTP_HEAD = 1,
 	HTTP_OTHER,          // Anything we don't support (POST, PUT, etc.)
 } HttpMethod;
 
-// Parsed HTTP request — fields point into raw[] or are computed values
+// Parsed HTTP request — all fields are null-terminated strings
 typedef struct {
-	HttpMethod method;            // GET, HEAD, or OTHER
-	char       path[4096];       // URL-decoded path, no query string
-	char       version[16];      // e.g. "HTTP/1.1"
+	HttpMethod method;                 // GET, HEAD, or OTHER
+	char       method_str[16];         // Raw method string (e.g. "GET", "POST", "DELETE")
+	char       path[4096];             // URL-decoded path, no query string
+	char       query[2048];            // URL-decoded query string (empty if none)
+	char       version[16];            // e.g. "HTTP/1.1"
 
-	char       auth[512];        // Authorization header value
-	char       connection[32];   // Connection header (e.g. "keep-alive", "close")
-	char       if_none_match[128]; // If-None-Match header (for ETag validation)
+	char       host[256];              // Host header
+	char       auth[512];              // Authorization header (full value)
 
-	int64_t    range_start;      // Range start (-1 = not specified / suffix)
-	int64_t    range_end;        // Range end   (-1 = open-ended)
+	char       connection[32];         // Connection header (e.g. "keep-alive", "close")
 
-	char       raw[8192];        // Raw request data (modified in-place during parsing)
-	size_t     raw_len;          // Length of raw data
+	char       if_none_match[128];     // If-None-Match header (for ETag validation)
+	char       if_modified_since[64];  // If-Modified-Since header
+
+	int64_t    range_start;            // Range start (-1 = not specified / suffix)
+	int64_t    range_end;              // Range end   (-1 = open-ended)
+
+	char       raw[8192];             // Raw request data (request line + all headers)
+	size_t     raw_len;               // Length of raw data
 } HttpRequest;
 
 // Parse a complete HTTP request from the transport

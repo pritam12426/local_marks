@@ -31,7 +31,6 @@ SRC      := $(wildcard src/*.c)
 FRONT_END_FILES = \
     front_end/javascript/browse.js \
     front_end/javascript/data.js \
-    front_end/javascript/health.js \
     front_end/javascript/info.js \
     front_end/javascript/keyboard.js \
     front_end/javascript/main.js \

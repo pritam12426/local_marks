@@ -80,7 +80,14 @@ from the hash table (no filesystem access for frontend files).
 ```sh
 marks2json create *.txt -T bookmarks.json          # create DB from pipe-delim .txt
 marks2json update *.txt -T bookmarks.json           # append new (--override to refresh)
+
 ./local-mark bookmarks.json
+
+# Check link health (HEAD requests) and print results to stdout
+marks2json find-dead -T bookmarks.json
+
+# Check link health and write new database with only healthy links
+marks2json find-dead -T bookmarks.json --healthy healthy.json
 ```
 
 ## Logging

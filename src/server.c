@@ -198,7 +198,7 @@ static void open_browser(const char *browser, const char *host, int port, bool t
 		LOG_WARN("Browser '%s' not found, trying xdg-open fallback", browser);
 		execlp("xdg-open", "xdg-open", url, (char *)NULL);
 		LOG_ERROR("xdg-open also failed to launch");
-#elif defined(__APPLE__) && defined(__MACH__)
+#elif defined(__APPLE__)
 		LOG_WARN("Browser '%s' not found, trying open fallback", browser);
 		execlp("open", "open", url, (char *)NULL);
 		LOG_ERROR("open also failed to launch");
@@ -219,6 +219,7 @@ int server_run(const ServerConfig *cfg)
 	sigaction(SIGTERM, &sa, NULL);
 
 	signal(SIGPIPE, SIG_IGN);
+	signal(SIGCHLD, SIG_IGN);
 
 	int lfd = make_listener(cfg->host, cfg->port);
 	if (lfd < 0) return -1;
@@ -240,6 +241,13 @@ int server_run(const ServerConfig *cfg)
 
 	// Initialize bookmark cache
 	bookmark_cache_init();
+
+	// Register all databases with the cache
+	for (int i = 0; i < cfg->bookmark_file_count; i++) {
+		if (cfg->bookmark_files[i]) {
+			bookmark_cache_add_db(cfg->bookmark_files[i]);
+		}
+	}
 
 	LOG_INFO("Serving on http://%s:%d", cfg->host, cfg->port);
 	LOG_INFO("Thread pool: %d workers", cfg->thread_pool_size);

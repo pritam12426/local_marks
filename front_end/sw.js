@@ -18,7 +18,6 @@ const STATIC_ASSETS = [
 	'/javascript/keyboard.js',
 	'/javascript/info.js',
 	'/javascript/random.js',
-	'/javascript/health.js',
 	'/stylesheet/style.css',
 	'/stylesheet/themes/light.css'
 ];

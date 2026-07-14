@@ -7,18 +7,24 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "common.h"
 #include "log.h"
 #include "project_config.h"
 
-// Global cache state (single entry for first DB file)
-static char *g_bookmark_json = NULL;
-static size_t g_bookmark_json_len = 0;
-static pthread_mutex_t g_bookmark_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
-static time_t g_bookmark_mtime = 0;
-static char g_bookmark_cache_path[256] = {0};
+// Per-database cache entry
+typedef struct {
+	char *json;
+	size_t json_len;
+	time_t mtime;
+	char path[256];
+} bookmark_cache_entry_t;
 
-// Load bookmark JSON file into memory
-static int load_bookmark_json(const char *path)
+static bookmark_cache_entry_t g_db_cache[MAX_BOOKMARK_FILES];
+static int g_db_cache_count = 0;
+static pthread_mutex_t g_bookmark_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// Load bookmark JSON file into a cache entry
+static int load_bookmark_json(const char *path, bookmark_cache_entry_t *entry)
 {
 	if (!path) {
 		LOG_INFO("No bookmark file configured");
@@ -41,48 +47,90 @@ static int load_bookmark_json(const char *path)
 		return -1;
 	}
 
-	g_bookmark_json = malloc((size_t)size + 1);
-	if (!g_bookmark_json) {
+	entry->json = malloc((size_t)size + 1);
+	if (!entry->json) {
 		LOG_ERROR("Failed to allocate %ld bytes for bookmark JSON", size);
 		fclose(f);
 		return -1;
 	}
 
-	size_t read = fread(g_bookmark_json, 1, (size_t)size, f);
+	size_t read = fread(entry->json, 1, (size_t)size, f);
 	fclose(f);
 
 	if (read != (size_t)size) {
 		LOG_ERROR("Short read on '%s': expected %ld, got %zu", path, size, read);
-		free(g_bookmark_json);
-		g_bookmark_json = NULL;
+		free(entry->json);
+		entry->json = NULL;
 		return -1;
 	}
 
-	g_bookmark_json[read] = '\0';
-	g_bookmark_json_len = read;
-	LOG_INFO("Loaded bookmark database: %s (%zu bytes)", path, g_bookmark_json_len);
+	entry->json[read] = '\0';
+	entry->json_len = read;
+	LOG_INFO("Loaded bookmark database: %s (%zu bytes)", path, entry->json_len);
 	return 0;
 }
 
 void bookmark_cache_init(void)
 {
 	pthread_mutex_init(&g_bookmark_cache_mutex, NULL);
-	g_bookmark_json = NULL;
-	g_bookmark_json_len = 0;
-	g_bookmark_mtime = 0;
-	g_bookmark_cache_path[0] = '\0';
+	for (int i = 0; i < MAX_BOOKMARK_FILES; i++) {
+		g_db_cache[i].json = NULL;
+		g_db_cache[i].json_len = 0;
+		g_db_cache[i].mtime = 0;
+		g_db_cache[i].path[0] = '\0';
+	}
+	g_db_cache_count = 0;
 }
 
 void bookmark_cache_cleanup(void)
 {
 	pthread_mutex_lock(&g_bookmark_cache_mutex);
-	free(g_bookmark_json);
-	g_bookmark_json = NULL;
-	g_bookmark_json_len = 0;
-	g_bookmark_mtime = 0;
-	g_bookmark_cache_path[0] = '\0';
+	for (int i = 0; i < MAX_BOOKMARK_FILES; i++) {
+		free(g_db_cache[i].json);
+		g_db_cache[i].json = NULL;
+		g_db_cache[i].json_len = 0;
+		g_db_cache[i].mtime = 0;
+		g_db_cache[i].path[0] = '\0';
+	}
+	g_db_cache_count = 0;
 	pthread_mutex_unlock(&g_bookmark_cache_mutex);
 	pthread_mutex_destroy(&g_bookmark_cache_mutex);
+}
+
+// Add a database path to the cache (call during startup for each DB)
+void bookmark_cache_add_db(const char *path)
+{
+	if (!path) return;
+
+	pthread_mutex_lock(&g_bookmark_cache_mutex);
+	if (g_db_cache_count < MAX_BOOKMARK_FILES) {
+		bookmark_cache_entry_t *entry = &g_db_cache[g_db_cache_count];
+		strncpy(entry->path, path, sizeof(entry->path) - 1);
+		entry->path[sizeof(entry->path) - 1] = '\0';
+		entry->json = NULL;
+		entry->json_len = 0;
+		entry->mtime = 0;
+		g_db_cache_count++;
+	}
+	pthread_mutex_unlock(&g_bookmark_cache_mutex);
+}
+
+// Find or create cache entry for a path
+static bookmark_cache_entry_t *get_or_create_entry(const char *path)
+{
+	for (int i = 0; i < g_db_cache_count; i++) {
+		if (strcmp(g_db_cache[i].path, path) == 0) {
+			return &g_db_cache[i];
+		}
+	}
+	if (g_db_cache_count < MAX_BOOKMARK_FILES) {
+		bookmark_cache_entry_t *entry = &g_db_cache[g_db_cache_count];
+		strncpy(entry->path, path, sizeof(entry->path) - 1);
+		entry->path[sizeof(entry->path) - 1] = '\0';
+		g_db_cache_count++;
+		return entry;
+	}
+	return NULL;
 }
 
 const char *get_cached_bookmark_json(const char *path)
@@ -91,33 +139,38 @@ const char *get_cached_bookmark_json(const char *path)
 
 	pthread_mutex_lock(&g_bookmark_cache_mutex);
 
+	bookmark_cache_entry_t *entry = get_or_create_entry(path);
+	if (!entry) {
+		pthread_mutex_unlock(&g_bookmark_cache_mutex);
+		return NULL;
+	}
+
 	// First load or path changed
-	if (!g_bookmark_json || strcmp(g_bookmark_cache_path, path) != 0) {
+	if (!entry->json || strcmp(entry->path, path) != 0) {
 		LOG_INFO("Loading bookmark DB (first load): %s", path);
 	} else {
 		// Check mtime for cache invalidation
 		struct stat st;
-		if (stat(path, &st) == 0 && st.st_mtime != g_bookmark_mtime) {
+		if (stat(path, &st) == 0 && st.st_mtime != entry->mtime) {
 			LOG_INFO("Reloading bookmark DB (mtime changed): %s (old: %ld, new: %ld)",
-			         path, (long)g_bookmark_mtime, (long)st.st_mtime);
+			         path, (long)entry->mtime, (long)st.st_mtime);
 		} else {
 			// Cache hit - same mtime
 			pthread_mutex_unlock(&g_bookmark_cache_mutex);
-			return g_bookmark_json;
+			return entry->json;
 		}
 	}
 
 	// Load new file
-	if (load_bookmark_json(path) == 0) {
-		strncpy(g_bookmark_cache_path, path, sizeof(g_bookmark_cache_path) - 1);
-		g_bookmark_cache_path[sizeof(g_bookmark_cache_path) - 1] = '\0';
-		// Get actual mtime
+	if (load_bookmark_json(path, entry) == 0) {
+		strncpy(entry->path, path, sizeof(entry->path) - 1);
+		entry->path[sizeof(entry->path) - 1] = '\0';
 		struct stat st;
 		if (stat(path, &st) == 0) {
-			g_bookmark_mtime = st.st_mtime;
+			entry->mtime = st.st_mtime;
 		}
 		pthread_mutex_unlock(&g_bookmark_cache_mutex);
-		return g_bookmark_json;
+		return entry->json;
 	}
 
 	pthread_mutex_unlock(&g_bookmark_cache_mutex);
@@ -126,5 +179,54 @@ const char *get_cached_bookmark_json(const char *path)
 
 size_t get_cached_bookmark_json_len(void)
 {
-	return g_bookmark_json_len;
+	// Return length of the last accessed database (index 0 if available)
+	if (g_db_cache_count > 0 && g_db_cache[0].json) {
+		return g_db_cache[0].json_len;
+	}
+	return 0;
+}
+
+const char *get_cached_bookmark_json_by_index(int index)
+{
+	if (index < 0 || index >= g_db_cache_count) return NULL;
+
+	pthread_mutex_lock(&g_bookmark_cache_mutex);
+	bookmark_cache_entry_t *entry = &g_db_cache[index];
+
+	if (!entry->json) {
+		// Try to load if not loaded yet
+		if (load_bookmark_json(entry->path, entry) == 0) {
+			struct stat st;
+			if (stat(entry->path, &st) == 0) {
+				entry->mtime = st.st_mtime;
+			}
+			pthread_mutex_unlock(&g_bookmark_cache_mutex);
+			return entry->json;
+		}
+		pthread_mutex_unlock(&g_bookmark_cache_mutex);
+		return NULL;
+	}
+
+	// Check mtime for cache invalidation
+	struct stat st;
+	if (stat(entry->path, &st) == 0 && st.st_mtime != entry->mtime) {
+		LOG_INFO("Reloading bookmark DB (mtime changed): %s (old: %ld, new: %ld)",
+		         entry->path, (long)entry->mtime, (long)st.st_mtime);
+		if (load_bookmark_json(entry->path, entry) == 0) {
+			entry->mtime = st.st_mtime;
+			pthread_mutex_unlock(&g_bookmark_cache_mutex);
+			return entry->json;
+		}
+		pthread_mutex_unlock(&g_bookmark_cache_mutex);
+		return NULL;
+	}
+
+	pthread_mutex_unlock(&g_bookmark_cache_mutex);
+	return entry->json;
+}
+
+size_t get_cached_bookmark_json_len_by_index(int index)
+{
+	if (index < 0 || index >= g_db_cache_count) return 0;
+	return g_db_cache[index].json_len;
 }

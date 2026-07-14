@@ -1,4 +1,10 @@
 /*
+ * Copyright (c) 2026 Pritam
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+/*
  * auth.c — HTTP Basic Authentication
  *
  * Decodes the Base64-encoded "Authorization: Basic …" header
@@ -84,7 +90,10 @@ int auth_check(const HttpRequest *req,
 	int user_set = expected_user && *expected_user;
 	int pass_set = expected_pass && *expected_pass;
 
-	LOG_DEBUG("auth_check: user_set=%d, pass_set=%d", user_set, pass_set);
+	LOG_DEBUG("auth_check: expected_user='%s', expected_pass='%s', user_set=%d, pass_set=%d",
+              expected_user ? expected_user : "(null)",
+              expected_pass ? expected_pass : "(null)",
+              user_set, pass_set);
 
 	// If neither user nor pass is configured, auth is disabled
 	if (!user_set && !pass_set) {

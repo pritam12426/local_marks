@@ -1,9 +1,16 @@
 /*
+ * Copyright (c) 2026 Pritam
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+/*
  * response.h — HTTP response builder API
  */
 
 #ifndef _RESPONSE_H_
 #define _RESPONSE_H_
+
 
 #include <stddef.h>
 

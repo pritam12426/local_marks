@@ -1,4 +1,10 @@
 /*
+ * Copyright (c) 2026 Pritam
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+/*
  * response.c — High-level HTTP response builders
  *
  * Provides functions for sending full HTTP responses (including error
@@ -69,9 +75,9 @@ void response_error(Transport *t, int status, const char *status_text, const cha
 {
 	char body[4096];
 	int  blen = snprintf(
-        body,
-        sizeof(body),
-        "<!DOCTYPE html>"
+	    body,
+	    sizeof(body),
+	    "<!DOCTYPE html>"
 	     "<html lang='en'>"
 	     "<head>"
 	     "<meta charset='utf-8'>"
@@ -151,11 +157,11 @@ void response_error(Transport *t, int status, const char *status_text, const cha
 	     "</div>"
 	     "</body>"
 	     "</html>",
-        status,
-        status_text,
-        status,
-        status_text,
-        detail ? detail : "An unexpected error occurred.");
+	    status,
+	    status_text,
+	    status,
+	    status_text,
+	    detail ? detail : "An unexpected error occurred.");
 
 	if ((size_t)blen > sizeof(body)) blen = (int)sizeof(body) - 1;
 	LOG_DEBUG("Sending error response: %d %s — %s", status, status_text, detail ? detail : "");
@@ -169,3 +175,5 @@ void response_redirect(Transport *t, const char *location)
 	snprintf(extra, sizeof extra, "Location: %s\r\n", location);
 	response_send(t, 301, "Moved Permanently", NULL, extra, NULL, 0, 0, 1);
 }
+// SSE helpers are in livereload.c (they write directly via transport_write).
+// These three wrappers were removed as dead code — no caller used them.

@@ -6,6 +6,8 @@
 
 import {
 	fetchBookmarks,
+	fetchDatabases,
+	switchDatabase,
 	getLayout,
 	setLayout,
 	initTheme,
@@ -17,6 +19,7 @@ import {initBrowse, renderBrowse} from './browse.js';
 import {renderInfo} from './info.js';
 import {initRandom, renderRandom} from './random.js';
 let data = null;
+let databases = [];
 
 // ── Boot ───────────────────────────────────
 
@@ -26,6 +29,7 @@ async function init()
 		initTheme();
 		initLayoutToggle();
 		initSidebarResizer();
+		await initDatabaseSelector();
 	} catch (err) {
 		console.error('❌ Init error:', err);
 	}
@@ -56,6 +60,71 @@ async function init()
 	if (!location.hash || location.hash === '#')
 		location.hash = '#browse';
 	renderRoute();
+}
+
+// ── Database selector ──────────────────────
+
+async function initDatabaseSelector()
+{
+	const select = document.getElementById('db-select');
+	if (!select) return;
+
+	try {
+		const res = await fetch('/api/databases', {cache: 'no-cache'});
+		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		const result = await res.json();
+		databases = result.databases || [];
+	} catch (err) {
+		console.warn('⚠️ Failed to fetch database list:', err);
+		databases = [];
+	}
+
+	// Populate select
+	select.innerHTML = '';
+	if (databases.length <= 1) {
+		// Hide selector if only one database
+		const selector = document.getElementById('db-selector');
+		if (selector) selector.style.display = 'none';
+		return;
+	}
+
+	databases.forEach((db, idx) => {
+		const opt = document.createElement('option');
+		opt.value = idx;
+		opt.textContent = db.file_name || `Database ${idx + 1}`;
+		select.appendChild(opt);
+	});
+
+	// Restore saved selection
+	const savedIdx = localStorage.getItem('localmarks-db-index');
+	if (savedIdx !== null && parseInt(savedIdx, 10) < databases.length) {
+		select.value = savedIdx;
+	}
+
+	select.addEventListener('change', async (e) => {
+		const idx = parseInt(e.target.value, 10);
+		if (isNaN(idx) || idx >= databases.length) return;
+		localStorage.setItem('localmarks-db-index', idx);
+		await loadDatabase(idx);
+	});
+
+	// Load initial database if not the first one
+	if (select.value && parseInt(select.value, 10) > 0) {
+		await loadDatabase(parseInt(select.value, 10));
+	}
+}
+
+async function loadDatabase(index)
+{
+	try {
+		const newData = await switchDatabase(index);
+		data = newData;
+		initBrowse(data);
+		initRandom(data);
+		renderRoute();  // Re-render current view with new data
+	} catch (err) {
+		console.error('❌ Failed to switch database:', err);
+	}
 }
 
 // ── Layout toggle ──────────────────────────
@@ -163,7 +232,6 @@ function initSidebarResizer()
 		handle.removeEventListener('dblclick', onDblClick);
 	};
 }
-
 
 
 // ── Router ─────────────────────────────────

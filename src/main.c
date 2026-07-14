@@ -35,8 +35,8 @@ static struct argp_option options[] = {
 	{ 0, 0, 0, 0, "Connection:", 3 },
 	{ "port",       'P', "PORT",  0,  "TCP port to listen on (default: 8080)",                      3 },
 	{ "host",       'H', "HOST",  0,  "Listener host / IP (default: localhost)",                    3 },
-	{ "threads",    't', "NUM",   0,  "Thread pool size (default: 2)",                              3 },
-	{ "keep-alive", 'k', "SECS",  0,  "Keep-alive timeout in seconds (default: 3, 0 = disable)",   3 },
+	{ "threads",    'T', "NUM",   0,  "Thread pool size (default: 2)",                              3 },
+	{ "keep-alive", 'K', "SECS",  0,  "Keep-alive timeout in seconds (default: 3, 0 = disable)",   3 },
 	{ "max-conns",  'M', "NUM",   0,  "Max concurrent connections per IP (default: 0 = unlimited)", 3 },
 
 	{ 0 }
@@ -51,8 +51,8 @@ typedef struct {
 	const char  *host;             // -H: bind address (default: localhost)
 
 	int          port;             // -P: listen port (default: 8080)
-	int          threads;          // -t: thread pool size (default: 2)
-	int          keep_alive;       // -k: keep-alive timeout (default: 3)
+	int          threads;          // -T: thread pool size (default: 2)
+	int          keep_alive;       // -K: keep-alive timeout (default: 3)
 	int          max_conns;        // -M: max conns per IP (default: 0 = unlimited)
 
 	const char    *log_file;      // -F: Where it has to append logs instead of STDERR
@@ -110,7 +110,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 	case 'p': G_Args.pass      = arg;  break;
 	case 'u': G_Args.user      = arg;  break;
 	case 'B': G_Args.browser   = arg; break;
-	case 't': {
+	case 'T': {
 		char *end;
 		long  val = strtol(arg, &end, 10);
 		if (*arg == '\0' || *end != '\0')
@@ -120,7 +120,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		G_Args.threads = (int)val;
 		break;
 	}
-	case 'k': {
+	case 'K': {
 		char *end;
 		long  val = strtol(arg, &end, 10);
 		if (*arg == '\0' || *end != '\0')
@@ -213,6 +213,7 @@ ServerConfig cfg = {
 		.keep_alive_timeout = G_Args.keep_alive,
 		.max_conns_per_ip  = G_Args.max_conns,
 	};
+
 	for (int i = 0; i < G_Args.bookmark_file_count; i++) {
 		cfg.bookmark_files[i] = G_Args.bookmark_files[i];
 	}
