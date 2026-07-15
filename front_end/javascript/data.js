@@ -69,6 +69,20 @@ export function setActiveDbIndex(idx)
 	localStorage.setItem(ACTIVE_DB_KEY, String(idx));
 }
 
+export async function getActiveDbName()
+{
+	try {
+		const {databases} = await fetchDatabases();
+		const idx = getActiveDbIndex();
+		if (databases && databases[idx]) {
+			return databases[idx].file_name || 'bookmarks.json';
+		}
+	} catch {
+		// ignore
+	}
+	return 'bookmarks.json';
+}
+
 // ── Database list & bookmark fetching ──────
 
 export async function fetchDatabases()
@@ -81,7 +95,7 @@ export async function fetchDatabases()
 
 export async function fetchBookmarks(idx = getActiveDbIndex())
 {
-	const url = idx > 0 ? `/bookmarks/${idx}.json` : 'bookmarks.json';
+	const url = idx > 0 ? `/bookmarks/${idx}.json` : '/bookmarks.json';
 	try {
 		const res = await fetch(url, {cache: 'no-cache'});
 		if (!res.ok)
@@ -165,12 +179,12 @@ export function toggleTheme()
 
 function updateThemeToggleIcon(theme)
 {
-	const btn = document.getElementById('theme-toggle');
-	if (btn) {
+	const btns = document.querySelectorAll('.theme-toggle');
+	btns.forEach(btn => {
 		btn.textContent = theme === 'dark' ? '☀️' : '🌙';
 		btn.setAttribute('aria-label',
 		                 theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
-	}
+	});
 }
 
 export function initTheme()
@@ -179,10 +193,10 @@ export function initTheme()
 	document.documentElement.setAttribute('data-theme', theme);
 	updateThemeToggleIcon(theme);
 
-	const toggle = document.getElementById('theme-toggle');
-	if (toggle) {
+	const toggles = document.querySelectorAll('.theme-toggle');
+	toggles.forEach(toggle => {
 		toggle.addEventListener('click', toggleTheme);
-	}
+	});
 
 	// Listen for system preference changes
 	const mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
@@ -196,7 +210,7 @@ export function initTheme()
 
 	// Return cleanup function
 	return () => {
-		if (toggle) toggle.removeEventListener('click', toggleTheme);
+		toggles.forEach(toggle => toggle.removeEventListener('click', toggleTheme));
 		mediaQuery.removeEventListener('change', handler);
 	};
 }

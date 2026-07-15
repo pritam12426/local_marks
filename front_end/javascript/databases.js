@@ -7,16 +7,43 @@
 import {esc} from './data.js';
 import {fetchDatabases, getActiveDbIndex, setActiveDbIndex} from './data.js';
 
-let elList  = null;
-let elError = null;
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+let elList       = null;
+let elError      = null;
+let elSearch     = null;
+let elClearBtn   = null;
+let allDatabases = [];
 
 export function initDatabaseSelector()
 {
-	elList  = document.getElementById('db-select-list');
-	elError = document.getElementById('db-select-error');
+	elList    = document.getElementById('db-select-list');
+	elError   = document.getElementById('db-select-error');
+	elSearch  = document.getElementById('db-select-search-input');
+	elClearBtn = document.getElementById('db-select-clear-search');
+
+	if (elSearch) {
+		elSearch.addEventListener('input', () => {
+			const q = elSearch.value.toLowerCase();
+			filterDatabases(q);
+			elClearBtn.hidden = !q;
+		});
+		elSearch.addEventListener('keydown', e => {
+			if (e.key === 'Escape') {
+				elSearch.value = '';
+				filterDatabases('');
+				elClearBtn.hidden = true;
+			}
+		});
+	}
+	if (elClearBtn) {
+		elClearBtn.addEventListener('click', () => {
+			elSearch.value = '';
+			filterDatabases('');
+			elClearBtn.hidden = true;
+			elSearch.focus();
+		});
+	}
+
+	initDbKeyboardNavigation();
 }
 
 export async function renderDatabaseSelector()
@@ -40,10 +67,10 @@ export async function renderDatabaseSelector()
 		return;
 	}
 
-	const databases = payload.databases || [];
+	allDatabases = payload.databases || [];
 	const activeIdx = getActiveDbIndex();
 
-	if (!databases.length) {
+	if (!allDatabases.length) {
 		elList.innerHTML = `
 			<div class="state-empty">
 				<div class="state-icon">🛢️</div>
@@ -52,12 +79,48 @@ export async function renderDatabaseSelector()
 		return;
 	}
 
+	renderCards(allDatabases);
+}
+
+function filterDatabases(query)
+{
+	const filtered = allDatabases.filter(db => {
+		const name = (db.file_name || '').toLowerCase();
+		const path = (db.absolute_path || '').toLowerCase();
+		return name.includes(query) || path.includes(query);
+	});
+	renderCards(filtered);
+}
+
+function renderCards(databases)
+{
+	if (!elList) return;
+
+	if (!databases.length) {
+		elList.innerHTML = `
+			<div class="state-empty">
+				<div class="state-icon">🔍</div>
+				<p>No databases match your filter.</p>
+			</div>`;
+		return;
+	}
+
+	const activeIdx = getActiveDbIndex();
 	const frag = document.createDocumentFragment();
-	databases.forEach((db, idx) => frag.appendChild(buildDbCard(db, idx, idx === activeIdx)));
+	databases.forEach((db, idx) => {
+		const originalIdx = allDatabases.indexOf(db);
+		frag.appendChild(buildDbCard(db, originalIdx, originalIdx === activeIdx));
+	});
 
 	elList.innerHTML = '';
 	elList.appendChild(frag);
+
+	// Update dbCards reference for keyboard navigation
+	dbCards = Array.from(elList.querySelectorAll('.db-card'));
+	dbFocusedIndex = -1;
 }
+
+// ── Helpers ──────────────────────────────────
 
 function buildDbCard(db, idx, isActive)
 {
@@ -65,6 +128,7 @@ function buildDbCard(db, idx, isActive)
 	card.type      = 'button';
 	card.className = 'db-card' + (isActive ? ' active' : '');
 	card.setAttribute('aria-label', `Open ${db.file_name}${isActive ? ' (current)' : ''}`);
+	card.tabIndex  = -1;
 
 	const owner = db.user || db.uid;
 	const group = db.group || db.gid;
@@ -76,6 +140,7 @@ function buildDbCard(db, idx, isActive)
 		</div>
 		<div class="db-card-meta">
 			<span class="db-card-perm">${permString(db.mode)} ${esc(String(owner))}:${esc(String(group))}</span>
+			<span class="db-card-size">${esc(formatBytes(db.file_size))}</span>
 			<span class="db-card-date">${absoluteTime(db.mTime_sec)}</span>
 		</div>
 		${isActive ? '<span class="db-card-badge">Current</span>' : ''}
@@ -85,24 +150,18 @@ function buildDbCard(db, idx, isActive)
 	return card;
 }
 
-function selectDatabase(idx, isActive)
+function formatBytes(bytes)
 {
-	setActiveDbIndex(idx);
-	if (isActive) {
-		// Already the active DB — just go browse it, no need to reload.
-		location.hash = '#browse';
-		return;
+	if (!bytes && bytes !== 0)
+		return '—';
+	const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+	let i = 0;
+	while (bytes >= 1024 && i < units.length - 1) {
+		bytes /= 1024;
+		i++;
 	}
-	// Every view module caches the previously-loaded categories/state at
-	// init time, so hot-swapping the dataset safely would mean threading a
-	// reload through browse/search/sidebar/panel/random/info all at once.
-	// A full reload is simpler and avoids a whole class of stale-state
-	// bugs — this is a "switch workspace" action, not a frequent one.
-	location.hash = '#browse';
-	location.reload();
+	return `${bytes.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
-
-// ── Formatting helpers ──────────────────────
 
 function relativeTime(unixSec)
 {
@@ -137,6 +196,8 @@ function absoluteTime(unixSec)
 	       + `${pad2(h)}:${pad2(d.getMinutes())} ${ampm}`;
 }
 
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 function permString(mode)
 {
 	const m = parseInt(mode, 8) & 0o777;
@@ -146,4 +207,119 @@ function permString(mode)
 		(m & 0o004) ? 'r' : '-', (m & 0o002) ? 'w' : '-', (m & 0o001) ? 'x' : '-'
 	];
 	return '-' + bits.join('');
+}
+
+let dbFocusedIndex = -1;
+let dbCards = [];
+
+function focusDbCard()
+{
+	if (!dbCards.length) return;
+	if (dbFocusedIndex >= 0 && dbFocusedIndex < dbCards.length) {
+		dbCards[dbFocusedIndex].focus({preventScroll: true});
+		dbCards[dbFocusedIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'});
+	}
+}
+
+function blurCards()
+{
+	dbFocusedIndex = -1;
+	dbCards.forEach(card => {
+		card.classList.remove('focused');
+		card.removeAttribute('aria-selected');
+		card.tabIndex = -1;
+	});
+}
+
+function focusFirstDbCard()
+{
+	dbFocusedIndex = 0;
+	focusDbCard();
+}
+
+// ── Vim-style keyboard navigation for database selector ─────
+function initDbKeyboardNavigation()
+{
+	if (!elList) return;
+
+	// Make cards focusable and add keyboard handlers
+	elList.addEventListener('keydown', handleDbListKeys);
+
+	// Also handle keys on the search input when focused
+	if (elSearch) {
+		elSearch.addEventListener('keydown', e => {
+			if (e.key === 'ArrowDown' || e.key === 'j') {
+				e.preventDefault();
+				focusFirstDbCard();
+			}
+			if (e.key === 'Escape') {
+				elSearch.value = '';
+				filterDatabases('');
+				elClearBtn.hidden = true;
+			}
+		});
+	}
+}
+
+function handleDbListKeys(e)
+{
+	const cards = Array.from(elList.querySelectorAll('.db-card'));
+	if (!cards.length) return;
+
+	switch (e.key) {
+	case 'j':
+	case 'ArrowDown':
+		e.preventDefault();
+		e.stopPropagation();
+		if (dbFocusedIndex < cards.length - 1) {
+			dbFocusedIndex++;
+			focusDbCard();
+		}
+		break;
+	case 'k':
+	case 'ArrowUp':
+		e.preventDefault();
+		e.stopPropagation();
+		if (dbFocusedIndex > 0) {
+			dbFocusedIndex--;
+			focusDbCard();
+		} else if (dbFocusedIndex === 0) {
+			dbFocusedIndex = -1;
+			blurCards();
+			if (elSearch) elSearch.focus();
+		}
+		break;
+	case 'Enter':
+		if (dbFocusedIndex >= 0) {
+			e.preventDefault();
+			e.stopPropagation();
+			cards[dbFocusedIndex].click();
+		}
+		break;
+	case 'Escape':
+		blurCards();
+		if (elSearch) {
+			elSearch.value = '';
+			filterDatabases('');
+			elClearBtn.hidden = true;
+			elSearch.focus();
+		}
+		break;
+	}
+}
+
+function selectDatabase(idx, isActive)
+{
+	if (isActive) {
+		// Already the active DB — just go browse it, no need to reload.
+		location.hash = '#browse';
+		return;
+	}
+	// Every view module caches the previously-loaded categories/state at
+	// init time, so hot-swapping the dataset safely would mean threading a
+	// reload through browse/search/sidebar/panel/random/info all at once.
+	// A full reload is simpler and avoids a whole class of stale-state
+	// bugs — this is a "switch workspace" action, not a frequent one.
+	location.hash = '#browse';
+	location.reload();
 }

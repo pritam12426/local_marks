@@ -111,6 +111,9 @@ function renderDomainGrid(domainHash)
 	const container = document.getElementById('domain-grid');
 	const label     = document.getElementById('domain-count-label');
 
+	if (!container)
+		return;
+
 	if (label)
 		label.textContent = domains.length;
 

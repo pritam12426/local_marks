@@ -108,11 +108,14 @@ $(BUILD)/%.o: %.c $(FRONT_END_GENERATED_H)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Regenerate when any frontend file or the script itself changes
-$(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_H): $(FRONT_END_FILES) $(FRONT_END_SCRIPT)
+$(FRONT_END_GENERATED_C): $(FRONT_END_FILES) $(FRONT_END_SCRIPT)
 	@OUT_C_FILE="$(FRONT_END_GENERATED_C)" \
 	OUT_H_FILE="$(FRONT_END_GENERATED_H)" \
 	TARGET_FILES="$(FRONT_END_FILES)" \
 	bash $(FRONT_END_SCRIPT)
+
+$(FRONT_END_GENERATED_H): $(FRONT_END_GENERATED_C)
+	@# Header is generated as side-effect of .c generation
 
 $(FRONT_END_GENERATED_O): $(FRONT_END_GENERATED_C)
 	@mkdir -p $(dir $@)
@@ -121,7 +124,8 @@ $(FRONT_END_GENERATED_O): $(FRONT_END_GENERATED_C)
 $(BIN): $(OUT) $(FRONT_END_GENERATED_O) ## Build the local-mark binary
 	$(CC) $(LDFLAGS) -o $@ $(OUT) $(FRONT_END_GENERATED_O) $(LDLIBS)
 
-debug: $(BIN) ## Build the debug binary run `make debug -B O_DEBUG=1`
+debug: ## Build the debug binary run `make debug -B O_DEBUG=1`
+	$(MAKE) $(BIN) O_DEBUG=1
 
 install: all ## Install the local-mark binary
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/bin

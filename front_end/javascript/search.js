@@ -35,13 +35,20 @@ function buildIndex()
 	state.index = state.categories.flatMap(
 	    cat => (cat.bookmarks ||
 	            []).map(bm => ({
-		                    category: cat.category,
-		                    bookmark: bm,
-		                    text: [bm.title, bm.description, bm.url, ...(bm.tags || [])]
-		                              .filter(Boolean)
-		                              .join(' ')
-		                              .toLowerCase()
-	                    })));
+	                    category: cat.category,
+	                    bookmark: bm,
+	                    text: [bm.title, bm.description, bm.url, ...(bm.tags || [])]
+	                              .filter(Boolean)
+	                              .join(' ')
+	                              .toLowerCase()
+	            })));
+}
+
+// Call this when switching databases to update the categories reference
+export function setCategories(newCategories)
+{
+	state.categories = newCategories;
+	buildIndex();
 }
 
 export function rebuildIndex()
@@ -107,6 +114,9 @@ export function renderSearch(query)
 
 export function clearSearch()
 {
+	if (!state.searchEl || !state.clearEl || !state.catListEl)
+		return;
+
 	state.searchEl.value = '';
 	state.clearEl.classList.remove('visible');
 

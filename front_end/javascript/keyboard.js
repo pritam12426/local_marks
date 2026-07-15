@@ -11,7 +11,8 @@ const state = {
 	catListEl: null,
 	searchEl: null,
 	clearEl: null,
-	helpModal: null
+	helpModal: null,
+	lastKey: ''
 };
 
 export function initKeyboard(cfg)

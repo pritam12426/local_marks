@@ -6,14 +6,14 @@
 
 ## 1. Project Identity
 
-| Attribute        | Value                                                                                                                                                                   |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Name**         | local-mark                                                                                                                                                              |
-| **Language**     | C17 (strict: `-std=c17 -Wall -Wextra -Wpedantic -Wstrict-prototypes -Wmissing-prototypes -Wshadow -Wconversion`)                                                        |
-| **Platforms**    | Linux, macOS (also compiles on other POSIX)                                                                                                                             |
-| **Dependencies** | Zero runtime deps. Build-time: `argp-standalone` on macOS (Homebrew), `pthread`, C library                                                                              |
-| **Binary**       | Single executable `./local-mark` (~400 KB stripped)                                                                                                                     |
-| **License**      | MIT                                                                                                                                                                     |
+| Attribute        | Value                                                                                                                                                                         |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**         | local-mark                                                                                                                                                                    |
+| **Language**     | C17 (strict: `-std=c17 -Wall -Wextra -Wpedantic -Wstrict-prototypes -Wmissing-prototypes -Wshadow -Wconversion`)                                                              |
+| **Platforms**    | Linux, macOS (also compiles on other POSIX)                                                                                                                                   |
+| **Dependencies** | Zero runtime deps. Build-time: `argp-standalone` on macOS (Homebrew), `pthread`, C library                                                                                    |
+| **Binary**       | Single executable `./local-mark` (~400 KB stripped)                                                                                                                           |
+| **License**      | MIT                                                                                                                                                                           |
 | **Philosophy**   | _Local-first bookmark browser._ Single binary serving embedded SPA + multi-database JSON API. No config files, no env vars, no TLS, no external DB. All config via CLI flags. |
 
 **Not a framework.** Not a library. A self-contained tool for browsing bookmark databases locally.
@@ -23,27 +23,27 @@
 ## 2. High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            main thread                                       │
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                            main thread                                        │
 │  argp CLI → log_init → vfs_hash_init → header_cache_init                   │
-│       ↓                 ↓                  ↓                                │
-│  bookmark_cache_init → thread_pool_create                                  │
+│       ↓                 ↓                  ↓                               │
+│  bookmark_cache_init → thread_pool_create                                    │
 │       ↓                                                                      │
-│  ratelimit_create (if --max-conns) → make_listener                         │
+│  ratelimit_create (if --max-conns) → make_listener                           │
 │       ↓                                                                      │
-│  accept() loop ──────────────────────────────────────────────────────────┐  │
-│       │                                                                  │  │
-│       ▼                                                                  │  │
-│  transport_new() + ratelimit_accept() + thread_pool_submit()             │  │
+│  accept() loop ────────────────────────────────────────────────────────────┐  │
+│       │                                                                    │  │
+│       ▼                                                                   │  │
+│  transport_new() + ratelimit_accept() + thread_pool_submit()               │  │
 └─────────┼──────────────────────────────────────────────────────────────────┼──┘
           │                                                                  │
-          ▼                                                                  ▼
-┌─────────────────────────┐                                  ┌─────────────────────────┐
-│  thread pool (N workers)│                                  │  dedicated threads      │
-│  ┌─────┐ ┌─────┐ ┌─────┐ │                                  │  ┌──────────────────┐  │
-│  │ W1  │ │ W2  │ │ WN  │ │                                  │  │ log consumer     │  │
-│  └─────┘ └─────┘ └─────┘ │                                  │  │ (drains ring buf)│  │
-│        ▲        ▲      │                                  │  └──────────────────┘  │
+          ▼                                                                 ▼
+┌──────────────────────────┐                                  ┌─────────────────────────┐
+│  thread pool (N workers) │                                  │  dedicated threads      │
+│  ┌─────┐ ┌─────┐ ┌─────┐ │                                  │  ┌──────────────────┐   │
+│  │ W1  │ │ W2  │ │ WN  │ │                                  │  │ log consumer     │   │
+│  └─────┘ └─────┘ └─────┘ │                                  │  │ (drains ring buf)│   │
+│        ▲        ▲      │                                  │  └──────────────────┘   │
 │        │        │        │                                  └─────────────────────────┘
 │  circular work queue     │
 │  (4096 slots, mutex +    │
@@ -52,31 +52,31 @@
            │
            │ Worker request handling:
            ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         WORKER THREAD (per connection)                       │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
-│  │ http_parse  │───▶│ auth_check? │───▶│ api_handle  │───▶│   DONE      │  │
-│  │ _request()  │    │ (401/OK)    │    │ _request()  │    │ (if API)    │  │
-│  └─────────────┘    └─────────────┘    └──────┬──────┘    └─────────────┘  │
-│                                                │                              │
-│                                                ▼ (not API)                   │
-│                                        ┌─────────────────┐                  │
-│                                        │  file_serve()   │                  │
-│                                        │  (VFS lookup)   │                  │
-│                                        │  vfs_lookup()   │                  │
-│                                        │       │         │                  │
-│                                        │       ▼         │                  │
-│                                        │  vfs_entry*     │                  │
-│                                        │  (gzip data)    │                  │
-│                                        │       │         │                  │
-│                                        │       ▼         │                  │
-│                                        │ response_send() │                  │
-│                                        │ (writev + ETag  │                  │
-│                                        │  + Range +      │                  │
-│                                        │  Content-       │                  │
-│                                        │  Encoding)      │                  │
-│                                        └─────────────────┘                  │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                         WORKER THREAD (per connection)                         │
+│  ┌─────────────┐      ┌─────────────┐     ┌─────────────┐     ┌─────────────┐  │
+│  │ http_parse  │───▶ │ auth_check? │───▶│ api_handle  │───▶│   DONE      │  │
+│  │ _request()  │      │ (401/OK)    │     │ _request()  │     │ (if API)    │  │
+│  └─────────────┘      └─────────────┘     └──────┬──────┘     └─────────────┘  │
+│                                                │                               │
+│                                                ▼ (not API)                    │
+│                                        ┌─────────────────┐                     │
+│                                        │  file_serve()   │                     │
+│                                        │  (VFS lookup)   │                     │
+│                                        │  vfs_lookup()   │                     │
+│                                        │       │         │                     │
+│                                        │       ▼        │                     │
+│                                        │  vfs_entry*     │                     │
+│                                        │  (gzip data)    │                     │
+│                                        │       │         │                     │
+│                                        │       ▼        │                     │
+│                                        │ response_send() │                     │
+│                                        │ (writev + ETag  │                     │
+│                                        │  + Range +      │                     │
+│                                        │  Content-       │                     │
+│                                        │  Encoding)      │                     │
+│                                        └─────────────────┘                     │
+└────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Key invariants:**
@@ -188,10 +188,12 @@ src/
 ```
 
 **Auto-generated (build/):**
+
 - `gen_embedded_front_end_dir.c` — Embedded frontend file data (gzip-compressed C arrays)
 - `gen_embedded_front_end_dir.h` — Declarations for above
 
 **Frontend source (front_end/):**
+
 - `index.html` + `javascript/*.js` (10 modules: browse, data, databases, info, keyboard, main, panel, random, search, sidebar, tag_bar) + `stylesheet/*.css` + `favicon.ico` + `sw.js`
 - `embed_frontend.bash` — `xxd -i` + gzip per file → C arrays + vfs_entry table
 
@@ -322,12 +324,12 @@ struct Transport { int fd; };  // opaque to callers
 
 ### 4.14 `api.c` — API Endpoints
 
-| Endpoint                    | Description                                    |
-| --------------------------- | ---------------------------------------------- |
-| `GET /bookmarks.json`       | First database (backward compat)               |
-| `GET /bookmarks/<idx>.json` | Specific database by index (0, 1, 2...)        |
-| `GET /api/databases`        | List all databases with metadata               |
-| `GET /api/databases/<idx>`  | Single database metadata                       |
+| Endpoint                    | Description                             |
+| --------------------------- | --------------------------------------- |
+| `GET /bookmarks.json`       | First database (backward compat)        |
+| `GET /bookmarks/<idx>.json` | Specific database by index (0, 1, 2...) |
+| `GET /api/databases`        | List all databases with metadata        |
+| `GET /api/databases/<idx>`  | Single database metadata                |
 
 All return `application/json; charset=utf-8` with `Cache-Control: no-cache`.
 
@@ -442,46 +444,46 @@ xxd -n SYMBOL -i gzip_stage/xxx.gz
 
 ## 7. Testing
 
-| Suite       | Command                   | What It Covers                                    |
-| ----------- | ------------------------- | ------------------------------------------------- |
-| Manual      | `./local-mark db.json`    | Full server + frontend test                       |
-| Multi-DB    | `./local-mark db1.json db2.json` | Database switching, API endpoints           |
-| Build       | `make clean && make`      | Clean rebuild, no warnings (except known)         |
+| Suite    | Command                          | What It Covers                            |
+| -------- | -------------------------------- | ----------------------------------------- |
+| Manual   | `./local-mark db.json`           | Full server + frontend test               |
+| Multi-DB | `./local-mark db1.json db2.json` | Database switching, API endpoints         |
+| Build    | `make clean && make`             | Clean rebuild, no warnings (except known) |
 
 ---
 
 ## 8. Key Design Decisions (Rationale)
 
-| Decision                          | Why                                                                                    |
-| --------------------------------- | -------------------------------------------------------------------------------------- |
-| Blocking I/O + thread pool        | Simpler than async; POSIX threads universal; pool prevents fork bomb                   |
-| 4 KB buffered header reads        | Reduces syscalls from O(header_bytes) to ~1; avoids partial-read complexity            |
-| Embedded frontend (VFS)           | Single binary deployment; no filesystem access at runtime; gzip pre-compressed         |
-| VFS hash table (O(1) lookup)      | Fast embedded file serving; built once at startup                                      |
-| Multi-database cache with mtime   | Supports multiple JSON DBs; auto-reloads on file change                                |
-| User/group names in metadata      | Human-readable `/api/databases` output                                                 |
-| No directory listing              | Intentional. VFS only serves known embedded files.                                     |
-| No compression at runtime         | Files pre-gzipped at embed time; `Content-Encoding: gzip` header added                |
-| No TLS                            | Zero-dep promise. Use reverse proxy (Caddy, nginx) for HTTPS                          |
-| Opaque `Transport`                | Future TLS swap without touching callers                                               |
-| Lock-free ring logger             | Eliminates mutex contention under load; consumer batches I/O                           |
-| Pre-computed headers              | Date/Server/Connection formatted once/sec, not per-request                             |
-| `writev()` header+body            | Single syscall, fewer TCP segments                                                     |
-| Hand-rolled ETag hex              | Avoids `snprintf` in hot path                                                          |
+| Decision                        | Why                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------ |
+| Blocking I/O + thread pool      | Simpler than async; POSIX threads universal; pool prevents fork bomb           |
+| 4 KB buffered header reads      | Reduces syscalls from O(header_bytes) to ~1; avoids partial-read complexity    |
+| Embedded frontend (VFS)         | Single binary deployment; no filesystem access at runtime; gzip pre-compressed |
+| VFS hash table (O(1) lookup)    | Fast embedded file serving; built once at startup                              |
+| Multi-database cache with mtime | Supports multiple JSON DBs; auto-reloads on file change                        |
+| User/group names in metadata    | Human-readable `/api/databases` output                                         |
+| No directory listing            | Intentional. VFS only serves known embedded files.                             |
+| No compression at runtime       | Files pre-gzipped at embed time; `Content-Encoding: gzip` header added         |
+| No TLS                          | Zero-dep promise. Use reverse proxy (Caddy, nginx) for HTTPS                   |
+| Opaque `Transport`              | Future TLS swap without touching callers                                       |
+| Lock-free ring logger           | Eliminates mutex contention under load; consumer batches I/O                   |
+| Pre-computed headers            | Date/Server/Connection formatted once/sec, not per-request                     |
+| `writev()` header+body          | Single syscall, fewer TCP segments                                             |
+| Hand-rolled ETag hex            | Avoids `snprintf` in hot path                                                  |
 
 ---
 
 ## 9. Performance Characteristics
 
-| Metric                         | Mechanism                       | Impact                                                             |
-| ------------------------------ | ------------------------------- | ------------------------------------------------------------------ |
-| Static file throughput         | Pre-gzipped VFS + writev        | Minimal CPU, fast delivery                                         |
-| Per-request alloc              | Near-zero (VFS buffers static)  | Near-zero allocator contention                                     |
-| Logging overhead               | Lock-free ring + batched fwrite | ~50 ns / call under load                                           |
-| Header formatting              | Cached Date/Server/Connection   | Saves 3× `snprintf` + `time()` + `gmtime_r()` + `strftime()` / req |
-| Syscall count (response)       | `writev()` header+body          | 1 syscall vs 2+                                                    |
-| Rate limiter scaling           | Fixed 1024-slot hash table      | O(1) per IP, no growth overhead                                    |
-| Multi-DB cache                 | mtime-based invalidation        | Instant reload on file change, no polling                          |
+| Metric                   | Mechanism                       | Impact                                                             |
+| ------------------------ | ------------------------------- | ------------------------------------------------------------------ |
+| Static file throughput   | Pre-gzipped VFS + writev        | Minimal CPU, fast delivery                                         |
+| Per-request alloc        | Near-zero (VFS buffers static)  | Near-zero allocator contention                                     |
+| Logging overhead         | Lock-free ring + batched fwrite | ~50 ns / call under load                                           |
+| Header formatting        | Cached Date/Server/Connection   | Saves 3× `snprintf` + `time()` + `gmtime_r()` + `strftime()` / req |
+| Syscall count (response) | `writev()` header+body          | 1 syscall vs 2+                                                    |
+| Rate limiter scaling     | Fixed 1024-slot hash table      | O(1) per IP, no growth overhead                                    |
+| Multi-DB cache           | mtime-based invalidation        | Instant reload on file change, no polling                          |
 
 ---
 
@@ -500,10 +502,10 @@ xxd -n SYMBOL -i gzip_stage/xxx.gz
 
 ## 11. Version History (Current: 1.1.0)
 
-| Version | Changes                                                                                                                                                                                                                              |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Version | Changes                                                                                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1.1.0   | Multi-database support (/bookmarks/<idx>.json, /api/databases), database selector UI, absolute_path via realpath, user/group names, live_server core optimizations merged |
-| 1.0.0   | Initial: embedded frontend + single bookmark.json + basic HTTP server                                                                                                                                |
+| 1.0.0   | Initial: embedded frontend + single bookmark.json + basic HTTP server                                                                                                     |
 
 ---
 
@@ -583,12 +585,14 @@ sudo make install PREFIX=~/.local  # ~/.local/bin
 ## 15. Frontend Architecture (Embedded SPA)
 
 **Views (hash-routed):**
+
 - `#browse` — Category sidebar + bookmark grid/list
 - `#info` — Database stats (counts, categories, tags, domains)
 - `#random` — Random link picker with filters
 - `#databases` — Database selector page (cards with metadata, switch workspace)
 
 **Key JS modules:**
+
 - `data.js` — IndexedDB cache (per-database keys `bookmarks:<idx>`), `fetchBookmarks(idx?)`, `fetchDatabases()`, `getActiveDbIndex()`, `setActiveDbIndex()`, favorites/theme/layout persistence
 - `databases.js` — Database selector UI: renders cards with file_name, mtime, permissions, owner/group; click to switch (reloads page)
 - `browse.js` — Category rendering, search, tag filtering, bookmark cards

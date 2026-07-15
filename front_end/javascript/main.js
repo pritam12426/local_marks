@@ -12,6 +12,7 @@ import {
 	getSidebarWidth,
 	setSidebarWidth,
 	getActiveDbIndex,
+	getActiveDbName,
 	fetchDatabases
 } from './data.js';
 
@@ -54,11 +55,11 @@ async function init()
 	initRandom(data);
 
 	// Register service worker for offline support
-	if ('serviceWorker' in navigator) {
-		navigator.serviceWorker.register('/sw.js')
-			.then(reg => console.log('✅ Service Worker registered:', reg.scope))
-			.catch(err => console.warn('⚠️ Service Worker registration failed:', err));
-	}
+	// if ('serviceWorker' in navigator) {
+	// 	navigator.serviceWorker.register('/sw.js')
+	// 		.then(reg => console.log('✅ Service Worker registered:', reg.scope))
+	// 		.catch(err => console.warn('⚠️ Service Worker registration failed:', err));
+	// }
 
 	bootRouter();
 }
@@ -67,7 +68,7 @@ function bootRouter()
 {
 	window.addEventListener('hashchange', renderRoute);
 	if (!location.hash || location.hash === '#')
-		location.hash = '#browse';
+		location.hash = '#databases';
 	renderRoute();
 }
 
@@ -210,15 +211,21 @@ function renderRoute()
 	}
 
 	// Update header title
-	const titles = {
-		browse: 'LocalMarks',
-		info: 'Database Info',
-		random: '🎲 Random Links',
-		databases: '🛢️ Select Database'
-	};
-	const h1     = document.getElementById('header-title');
-	if (h1)
-		h1.textContent = titles[route] || 'LocalMarks';
+	const h1 = document.getElementById('header-title');
+	if (h1) {
+		if (route === 'browse' || route === 'info' || route === 'random') {
+			// Show current database name on content pages
+			getActiveDbName().then(name => { h1.textContent = name; });
+		} else {
+			const titles = {
+				browse: 'LocalMarks',
+				info: 'Database Info',
+				random: '🎲 Random Links',
+				databases: '🛢️ Select Database'
+			};
+			h1.textContent = titles[route] || 'LocalMarks';
+		}
+	}
 
 	// Update layout toggle visibility
 	const lt = document.getElementById('layout-toggle');
@@ -228,7 +235,7 @@ function renderRoute()
 	switch (route) {
 	case 'browse':
 		if (!data)
-			break; // boot failed to load a database — error message already shown
+			break;  // boot failed to load a database — error message already shown
 		if (qParams.has('q'))
 			document.getElementById('search-input').value = qParams.get('q');
 		renderBrowse();
@@ -257,9 +264,9 @@ async function updateDbIndicator()
 	if (!nameEl)
 		return;
 	try {
-		const {databases} = await fetchDatabases();
-		const active       = databases?.[getActiveDbIndex()];
-		nameEl.textContent = active ? active.file_name : 'bookmarks.json';
+		const {databases}                = await fetchDatabases();
+		const                     active = databases?.[getActiveDbIndex()];
+		nameEl.textContent               = active ? active.file_name : 'bookmarks.json';
 	} catch {
 		// Selector page will surface the real error; keep the header quiet.
 		nameEl.textContent = 'bookmarks.json';

@@ -17,10 +17,11 @@ import {
 	renderPanel,
 	getActiveCategory as panelGetActive,
 	setActiveCategory as panelSetActive,
-	clearActiveTags
+	clearActiveTags,
+	notifyCategoriesChanged
 } from './panel.js';
 
-import {initSearch, renderSearch, clearSearch as searchClear} from './search.js';
+import {initSearch, renderSearch, clearSearch as searchClear, setCategories as searchSetCategories} from './search.js';
 import {initTagBar, getActiveTags, setActiveTags} from './tag_bar.js';
 import {initKeyboard, refreshCards, focusFirstCard} from './keyboard.js';
 import {getFavorites, buildCard} from './data.js';
@@ -83,6 +84,39 @@ export function initBrowse(data)
 	updateHeaderCount();
 	renderSidebarFn();
 	bindEvents();
+}
+
+// Call this when switching to a different database
+export function updateCategories(newCategories)
+{
+	allCategories = newCategories;
+	
+	// Update sidebar and panel with new categories
+	initSidebar({
+		categories: allCategories,
+		activeCategory: 0,
+		catListEl: elCatList,
+		sidebarCountEl: elSidebarCount
+	});
+	
+	initPanel({
+		categories: allCategories,
+		activeCategory: 0,
+		panelTitleEl: elPanelTitle,
+		bookmarkListEl: elBookmarkList
+	});
+	
+	// Update search index for new data
+	searchSetCategories(allCategories);
+	
+	activeCategory = 0;
+	searchQuery = '';
+	elClear.classList.remove('visible');
+	elSearch.value = '';
+	
+	updateHeaderCount();
+	renderSidebarFn();
+	renderPanel();
 }
 
 export function renderBrowse()

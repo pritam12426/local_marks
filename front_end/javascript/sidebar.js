@@ -24,6 +24,7 @@ export function getActiveCategory()
 export function setActiveCategory(index)
 {
 	state.activeCategory = index;
+	highlightSidebar(index);
 }
 
 export function renderSidebar()
@@ -31,14 +32,16 @@ export function renderSidebar()
 	const favCount = getFavoritesCount();
 	if (state.activeCategory === -1 && !favCount)
 		state.activeCategory = 0;
-	state.sidebarCountEl.textContent = state.categories.length;
+	
+	// Show total bookmark count in sidebar header
+	const totalBookmarks = state.categories.reduce((s, c) => s + (c.bookmarks || []).length, 0);
+	state.sidebarCountEl.textContent = totalBookmarks;
 
 	const frag = document.createDocumentFragment();
 
 	if (favCount) {
 		const li     = document.createElement('li');
-		li.innerHTML = `<span class="cat-label">⭐ Favorites</span><span class="cat-badge">${
-			favCount}</span>`;
+		li.innerHTML = `<span class="cat-label">⭐ Favorites</span><span class="cat-badge">${favCount}</span>`;
 		if (state.activeCategory === -1)
 			li.classList.add('active');
 		li.tabIndex = 0;

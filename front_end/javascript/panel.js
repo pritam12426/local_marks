@@ -7,6 +7,7 @@
 import {buildCard} from './data.js';
 import {getFavorites} from './data.js';
 import {renderTagBar, getActiveTags, setActiveTags} from './tag_bar.js';
+import {rebuildIndex} from './search.js';
 
 const state = {
 	categories: [],
@@ -117,4 +118,10 @@ function renderCards(bookmarks)
 	state.bookmarkListEl.appendChild(frag);
 
 	window.dispatchEvent(new CustomEvent('cards-rendered'));
+}
+
+// Notify search module to rebuild index when categories change
+export function notifyCategoriesChanged()
+{
+	rebuildIndex();
 }
