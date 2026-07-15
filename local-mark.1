@@ -1,0 +1,164 @@
+.\" Manpage for local-mark
+.\" Generated from local-mark project
+.\"
+.TH LOCAL-MARK 1 "July 2026" "local-mark 1.1.0" "User Commands"
+.SH NAME
+local-mark \- Local-first bookmark browser with embedded SPA and multi-database support
+.SH SYNOPSIS
+.B local-mark
+[\fIOPTION\fR]... \fIFILE\fR [\fIFILE\fR]...
+.SH DESCRIPTION
+.B local-mark
+is a local-first bookmark browser. It reads one or more JSON bookmark databases
+(created with \fBmarks2json\fR(1)) and serves an embedded single-page application
+(SPA) over HTTP. The frontend provides browsing, search, tag filtering, random
+link picking, database statistics, and a multi-database selector.
+
+All static assets (HTML, JavaScript, CSS, favicon, service worker) are
+gzip-compressed and embedded directly into the binary at compile time. No
+filesystem access is required at runtime for frontend assets.
+.SH OPTIONS
+.TP
+\fB-h\fR, \fB--help\fR
+Display help and exit.
+.TP
+\fB-V\fR, \fB--version\fRk
+Print version and exit.
+.TP
+\fB--usage\fR
+Display brief usage summary.
+.PP
+Logging:
+.TP
+\fB-L\fR, \fB--log-level\fR=\fILEVEL\fR
+Set log level: \fIerror\fR, \fIwarn\fR, \fIinfo\fR (default), \fIdebug\fR.
+.TP
+\fB-F\fR, \fB--log-file\fR=\fIFILE\fR
+Append logs to \fIFILE\fR instead of stderr.
+.TP
+\fB-R\fR, \fB--print-request\fR
+Log each client request with headers (verbose).
+.PP
+Authentication:
+.TP
+\fB-u\fR, \fB--user\fR=\fIUSER\fR
+Enable HTTP Basic Authentication with username \fIUSER\fR.
+.TP
+\fB-p\fR, \fB--pass\fR=\fIPASS\fR
+Enable HTTP Basic Authentication with password \fIPASS\fR.
+(Requires \fB--user\fR.)
+.PP
+Connection:
+.TP
+\fB-H\fR, \fB--host\fR=\fIHOST\fR
+Bind address (default: \fBlocalhost\fR). Use \fB0.0.0.0\fR for all interfaces.
+.TP
+\fB-P\fR, \fB--port\fR=\fIPORT\fR
+TCP port to listen on (default: \fB8080\fR).
+.TP
+\fB-T\fR, \fB--threads\fR=\fINUM\fR
+Thread pool size (default: \fB2\fR, range: \fB1-256\fR).
+.TP
+\fB-K\fR, \fB--keep-alive\fR=\fISECS\fR
+Keep-alive timeout in seconds (default: \fB3\fR, \fB0\fR = disable).
+.TP
+\fB-M\fR, \fB--max-conns\fR=\fINUM\fR
+Max concurrent connections per IP (default: \fB0\fR = unlimited, range: \fB0-1000\fR).
+.PP
+Browser:
+.TP
+\fB-B\fR, \fB--browser\fR=\fIBROWSER\fR
+Open \fIBROWSER\fR on startup (e.g., \fBfirefox\fR, \fBchrome\fR, \fBopen\fR on macOS).
+.PP
+Positional arguments:
+.TP
+\fIFILE\fR...
+Bookmark JSON database file(s) (max 10). At least one required.
+.SH FILES
+The JSON database files must follow the schema produced by \fBmarks2json\fR(1):
+.PP
+.nf
+{
+  "book_Marks": [
+    {
+      "category": "Category Name",
+      "bookmarks": [
+        {
+          "title": "Display Title",
+          "url": "https://example.com",
+          "description": "Optional description",
+          "tags": ["#tag1", "#tag2"],
+          "domain": "example.com",
+          "icon": "https://..."   // YouTube channels only
+        }
+      ]
+    }
+  ],
+  "book_mark_domain_hash": { "example.com": 42 },
+  "book_mark_tag_hash": { "#tag1": 10, "#tag2": 5 }
+}
+.fi
+.PP
+Categories are derived from filenames by \fBmarks2json\fR(1).
+.SH API ENDPOINTS
+.TP
+\fBGET /bookmarks.json\fR
+First database (backward compatibility).
+.TP
+\fBGET /bookmarks/<idx>.json\fR
+Database at index \fIidx\fR (0-based, matches CLI argument order).
+.TP
+\fBGET /api/databases\fR
+List all databases with metadata (name, path, size, mtime, permissions, owner/group).
+.TP
+\fBGET /api/databases/<idx>\fR
+Metadata for single database.
+.TP
+\fBGET /*\fR
+Embedded frontend assets (index.html, JS, CSS, favicon, sw.js).
+All served from memory with ETag, Range, and gzip support.
+.SH FRONTEND FEATURES
+.TP
+Database Selector (\fB#databases\fR)
+Landing page showing all databases as cards with metadata.
+Click a card to select; choice persisted in \fBlocalStorage\fR.
+.TP
+Browse View (\fB#browse\fR)
+Sidebar with categories (and Favorites), search (\fB/\fR), tag pills,
+layout toggle (single/grid/compact), resizable sidebar, keyboard navigation.
+.TP
+Info View (\fB#info\fR)
+Statistics, category bar chart, tag cloud, domain grid, link health checker.
+.TP
+Random View (\fB#random\fR)
+Pick N random links with optional category/tag filters; "Open All".
+.TP
+Theming
+Dark (default) and light themes via CSS variables.
+Auto-detects \fBprefers-color-scheme\fR; manual toggle persists to \fBlocalStorage\fR.
+.TP
+Persistence
+\fBlocalStorage\fR keys: \fBlocalmarks-active-db\fR, \fBlocalmarks-favorites\fR,
+\fBlocalmarks-layout\fR, \fBlocalmarks-sidebar-w\fR, \fBlocalmarks-theme\fR.
+\fBIndexedDB\fR cache (\fBLocalMarksCache\fR) for offline/stale-while-revalidate.
+.SH KEYBOARD SHORTCUTS (Browse View)
+.nf
+  j / DOWN_ARROW   Next bookmark
+  k / UP_ARROW     Previous bookmark
+  h / LEFT_ARROW   Back to categories (sidebar)
+  l / RIGHT_ARROW  Into bookmarks (cards)
+  gg               Jump to first
+  G                Jump to last
+  /                Focus search
+  Enter            Open in new tab
+  o                Open in same tab
+  yy               Copy URL (domain toast)
+  p                Toggle pin/favorite
+  Esc              Clear search / close help
+  ?                Toggle help modal
+  Ctrl/Cmd+K       Focus search
+.fi
+.SH AUTHOR
+Pritam <pritam12426@users.noreply.github.com>
+.SH LICENSE
+MIT License. Copyright (c) 2024-2026 Pritam.

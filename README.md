@@ -483,7 +483,6 @@ local_marks/
 │   ├── embed_frontend.bash     # Build: gzip + xxd -i per file
 │   ├── favicon.ico
 │   ├── index.html              # SPA shell (hash routing)
-│   ├── sw.js                   # Service Worker (offline)
 │   │
 │   ├── javascript/             # ES Modules
 │   │   ├── browse.js           # Browse view

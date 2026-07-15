@@ -112,7 +112,6 @@ local_marks/
 │   ├── embed_frontend.bash     # Build script: gzip + xxd -i per file → C arrays
 │   ├── favicon.ico             # Favicon
 │   ├── index.html              # SPA entry point (hash routing)
-│   ├── sw.js                   # Service Worker (offline caching)
 │   │
 │   ├── javascript/             # ES Modules
 │   │   ├── browse.js           # Browse view: categories, search, tags, cards
@@ -428,8 +427,7 @@ FRONT_END_FILES = \
     front_end/javascript/browse.js \
     front_end/javascript/data.js \
     ... \
-    front_end/index.html \
-    front_end/sw.js
+    front_end/index.html
 
 # embed_frontend.bash does per-file:
 gzip -9 -n -c front_end/xxx > gzip_stage/xxx.gz
@@ -621,7 +619,6 @@ sudo make install PREFIX=~/.local  # ~/.local/bin
 | ------------- | ------------------------------------------------------------------------------------- |
 | `index.html`  | SPA shell: header (search, layout toggle, DB switcher, theme toggle), 4 view sections |
 | `favicon.ico` | Site icon (served via VFS)                                                            |
-| `sw.js`       | Service Worker for offline caching of embedded assets                                 |
 
 ### 15.4 JSON Data Schema
 

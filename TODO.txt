@@ -1,0 +1,4 @@
+O_DEBUG := 0  # Debug binary (0 = release, 1 = debug)
+O_urMom := 0  # Debug binary (0 = release, 1 = debug)
+O_DEBUG := 0  # Debug binary (0 = release, 1 = debug)
+O_DEBUG := 0  # Debug binary (0 = release, 1 = debug)

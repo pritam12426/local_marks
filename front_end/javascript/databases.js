@@ -105,11 +105,24 @@ function renderCards(databases)
 		return;
 	}
 
+	// Compute display names: for duplicate filenames, show parent dir + filename
+	const nameCounts = new Map();
+	databases.forEach(db => {
+		const name = db.file_name || '';
+		nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+	});
+
 	const activeIdx = getActiveDbIndex();
 	const frag = document.createDocumentFragment();
 	databases.forEach((db, idx) => {
 		const originalIdx = allDatabases.indexOf(db);
-		frag.appendChild(buildDbCard(db, originalIdx, originalIdx === activeIdx));
+		const isDup = (nameCounts.get(db.file_name || '') || 0) > 1;
+		let displayName = db.file_name || '';
+		if (isDup && db.absolute_path) {
+			const dir = db.absolute_path.split('/').slice(-2, -1)[0]; // parent dir
+			if (dir) displayName = `${dir}/${displayName}`;
+		}
+		frag.appendChild(buildDbCard(db, originalIdx, originalIdx === activeIdx, displayName));
 	});
 
 	elList.innerHTML = '';
@@ -122,12 +135,12 @@ function renderCards(databases)
 
 // ── Helpers ──────────────────────────────────
 
-function buildDbCard(db, idx, isActive)
+function buildDbCard(db, idx, isActive, displayName)
 {
 	const card     = document.createElement('button');
 	card.type      = 'button';
 	card.className = 'db-card' + (isActive ? ' active' : '');
-	card.setAttribute('aria-label', `Open ${db.file_name}${isActive ? ' (current)' : ''}`);
+	card.setAttribute('aria-label', `Open ${displayName}${isActive ? ' (current)' : ''}`);
 	card.tabIndex  = -1;
 
 	const owner = db.user || db.uid;
@@ -135,7 +148,7 @@ function buildDbCard(db, idx, isActive)
 
 	card.innerHTML = `
 		<div class="db-card-top">
-			<span class="db-card-name">🛢️ ${esc(db.file_name)}</span>
+			<span class="db-card-name">🛢️ ${esc(displayName)}</span>
 			<span class="db-card-time">${relativeTime(db.mTime_sec)}</span>
 		</div>
 		<div class="db-card-meta">

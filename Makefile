@@ -21,7 +21,7 @@ STRIP ?= strip
 INSTALL ?= install
 
 # Convert targets to flags for backwards compatibility
-O_DEBUG := 0  # Debug binary (0 = release, 1 = debug)
+O_DEBUG := 0  ## Debug binary (0 = release, 1 = debug)
 
 ifneq ($(filter debug,$(MAKECMDGOALS)),)
 	O_DEBUG := 1
@@ -71,8 +71,7 @@ FRONT_END_FILES = \
     front_end/stylesheet/style.css \
     front_end/stylesheet/themes/light.css \
     front_end/favicon.ico \
-    front_end/index.html \
-    front_end/sw.js
+    front_end/index.html
 
 FRONT_END_SCRIPT       = front_end/embed_frontend.bash
 FRONT_END_GENERATED_C  = $(BUILD)/gen_embedded_front_end_dir.c
@@ -80,10 +79,10 @@ FRONT_END_GENERATED_H  = src/gen_embedded_front_end_dir.h
 FRONT_END_GENERATED_O  = $(BUILD)/gen_embedded_front_end_dir.o
 
 # Compiler warnings
-CFLAGS +=  -Wall -Wextra -Wpedantic \
-           -Wstrict-prototypes -Wmissing-prototypes \
-           -Wshadow -Wconversion \
-           -Wno-missing-field-initializers
+CFLAGS +=  -Wshadow -Wconversion \
+           -Wall -Wextra -Wpedantic \
+           -Wno-missing-field-initializers \
+           -Wstrict-prototypes -Wmissing-prototypes
 
 # Common flags
 CFLAGS += -Isrc -std=c17 -DLOG_SHOW_TIME_STAMP
@@ -96,11 +95,20 @@ OUT = $(SRC:%.c=$(BUILD)/%.o)
 
 all: $(BIN)
 
-help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-	awk 'BEGIN {FS = ":.*?## "}; {printf "\033[33m%-20s\033[0m %s\n", $$1, $$2}'
+help:  ## Show this help
+	@echo "Variable:"
+	@awk 'BEGIN {FS="  ## "} \
+		/^O_[a-zA-Z_]+[[:space:]]*:=/ { \
+		split($$1, a, /[[:space:]]*:=/); \
+		printf "  \033[36m%-20s\033[0m %s\n", a[1], $$2; \
+	}' $(MAKEFILE_LIST)
 
-$(BUILD): ## Create build directories automatically
+	@echo
+	@echo "Targets:"
+	@grep -E '^[a-zA-Z_-]+:.*  ## ' $(MAKEFILE_LIST) | \
+	awk 'BEGIN {FS="  ## "}; {printf "  \033[33m%-20s\033[0m %s\n", $$1, $$2}'
+
+$(BUILD):  ## Create build directories automatically
 	mkdir -p $(BUILD)
 
 $(BUILD)/%.o: %.c $(FRONT_END_GENERATED_H)
@@ -124,10 +132,10 @@ $(FRONT_END_GENERATED_O): $(FRONT_END_GENERATED_C)
 $(BIN): $(OUT) $(FRONT_END_GENERATED_O) ## Build the local-mark binary
 	$(CC) $(LDFLAGS) -o $@ $(OUT) $(FRONT_END_GENERATED_O) $(LDLIBS)
 
-debug: ## Build the debug binary run `make debug -B O_DEBUG=1`
+debug:  ## Build the debug binary run `make debug -B O_DEBUG=1`
 	$(MAKE) $(BIN) O_DEBUG=1
 
-install: all ## Install the local-mark binary
+install: all  ## Install the local-mark binary
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m 0755 $(BIN) $(DESTDIR)$(PREFIX)/bin/$(BIN)
 	$(INSTALL) -m 0755 $(MARKS2JSON) $(DESTDIR)$(PREFIX)/bin/marks2json
@@ -135,13 +143,13 @@ install: all ## Install the local-mark binary
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(MANPREFIX)/man1
 	$(INSTALL) -m 0755 local-mark.1 $(DESTDIR)$(MANPREFIX)/man1/$(BIN).1
 
-clean: ## Clean up build artifacts
+clean:  ## Clean up build artifacts
 	$(RM) -rf $(OUT) $(BIN) $(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_H)
 
-uninstall: ## Uninstall the local-mark binary
+uninstall:  ## Uninstall the local-mark binary
 	$(RM) $(DESTDIR)$(PREFIX)/bin/$(BIN)
 
-strip: $(BIN) ## Strip the local-mark binary
+strip: $(BIN)  ## Strip the local-mark binary
 	$(STRIP) $^
 
 .PHONY: all install uninstall strip clean debug
