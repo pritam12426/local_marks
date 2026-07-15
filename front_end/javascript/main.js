@@ -12,15 +12,13 @@ import {
 	getSidebarWidth,
 	setSidebarWidth,
 	getActiveDbIndex,
-	getActiveDbName,
-	fetchDatabases
+	getActiveDbName
 } from './data.js';
 
-import {initBrowse, renderBrowse} from './browse.js';
+import {initBrowse, renderBrowse, updateCategories} from './browse.js';
 import {renderInfo} from './info.js';
-import {initRandom, renderRandom} from './random.js';
+import {initRandom, renderRandom, updateRandomData} from './random.js';
 import {initDatabaseSelector, renderDatabaseSelector} from './databases.js';
-let data = null;
 
 // ── Boot ───────────────────────────────────
 
@@ -35,32 +33,8 @@ async function init()
 	}
 
 	initDatabaseSelector();
-	updateDbIndicator();
 
-	try {
-		data = await fetchBookmarks();
-	} catch (err) {
-		console.error('❌ Failed to load bookmarks:', err);
-		document.getElementById('bookmark-list').innerHTML = `
-			<div class="state-empty">
-				<div class="state-icon">❌</div>
-				<p>Could not load this database.</p>
-				<button class="state-action" onclick="location.hash='#databases'">🛢️ Choose a different database</button>
-			</div>`;
-		bootRouter();
-		return;
-	}
-
-	initBrowse(data);
-	initRandom(data);
-
-	// Register service worker for offline support
-	// if ('serviceWorker' in navigator) {
-	// 	navigator.serviceWorker.register('/sw.js')
-	// 		.then(reg => console.log('✅ Service Worker registered:', reg.scope))
-	// 		.catch(err => console.warn('⚠️ Service Worker registration failed:', err));
-	// }
-
+	// Don't fetch bookmarks on boot - wait for user to select a database
 	bootRouter();
 }
 
@@ -180,7 +154,40 @@ function initSidebarResizer()
 
 
 
+let data              = null;
+let dataPromise        = null;
+let loadedDbIdx        = null;  // which DB index `data` currently represents
+let browseInitialized  = false; // has initBrowse()/initRandom() ever run?
+
 // ── Router ─────────────────────────────────
+
+async function ensureDataLoaded()
+{
+	const dbIdx = getActiveDbIndex();
+	if (dbIdx === null) {
+		location.hash = '#databases';
+		return null;
+	}
+
+	// Already have fresh data for the currently-active database
+	if (data && loadedDbIdx === dbIdx)
+		return data;
+
+	// First load, or the active database changed since we last fetched —
+	// either way we need a new request.
+	if (!dataPromise || loadedDbIdx !== dbIdx) {
+		const requestedIdx = dbIdx;
+		dataPromise = fetchBookmarks(dbIdx).then(d => {
+			data       = d;
+			loadedDbIdx = requestedIdx;
+			return d;
+		}).catch(err => {
+			dataPromise = null;
+			throw err;
+		});
+	}
+	return dataPromise;
+}
 
 function renderRoute()
 {
@@ -197,9 +204,7 @@ function renderRoute()
 	if (view)
 		view.classList.add('active');
 
-	// Focus management on view switch — but don't yank focus away from the
-	// search box if the person is actively typing (e.g. a search that just
-	// auto-jumped them here from Info/Random).
+	// Focus management on view switch
 	const mainContent = document.getElementById('main-panel')
 	                    || document.querySelector('.main-panel')
 	                    || document.querySelector('.info-body')
@@ -214,7 +219,6 @@ function renderRoute()
 	const h1 = document.getElementById('header-title');
 	if (h1) {
 		if (route === 'browse' || route === 'info' || route === 'random') {
-			// Show current database name on content pages
 			getActiveDbName().then(name => { h1.textContent = name; });
 		} else {
 			const titles = {
@@ -234,42 +238,44 @@ function renderRoute()
 
 	switch (route) {
 	case 'browse':
-		if (!data)
-			break;  // boot failed to load a database — error message already shown
-		if (qParams.has('q'))
-			document.getElementById('search-input').value = qParams.get('q');
-		renderBrowse();
+		ensureDataLoaded().then(d => {
+			if (!d) return; // redirected to databases
+			if (qParams.has('q'))
+				document.getElementById('search-input').value = qParams.get('q');
+			if (!browseInitialized) {  // first load ever
+				initBrowse(d);
+				initRandom(d);
+				browseInitialized = true;
+			} else {
+				updateCategories(d);
+				updateRandomData(d);
+			}
+			renderBrowse();
+		}).catch(err => {
+			console.error('❌ Failed to load bookmarks:', err);
+			document.getElementById('bookmark-list').innerHTML = `
+				<div class="state-empty">
+					<div class="state-icon">❌</div>
+					<p>Could not load this database.</p>
+					<button class="state-action" onclick="location.hash='#databases'">🛢️ Choose a different database</button>
+				</div>`;
+		});
 		break;
 	case 'info':
-		if (!data)
-			break;
-		renderInfo(data);
+		ensureDataLoaded().then(d => {
+			if (!d) return;
+			renderInfo(d);
+		});
 		break;
 	case 'random':
-		if (!data)
-			break;
-		renderRandom();
+		ensureDataLoaded().then(d => {
+			if (!d) return;
+			renderRandom();
+		});
 		break;
 	case 'databases':
 		renderDatabaseSelector();
 		break;
-	}
-}
-
-// ── Header database indicator ──────────────
-
-async function updateDbIndicator()
-{
-	const nameEl = document.getElementById('db-indicator-name');
-	if (!nameEl)
-		return;
-	try {
-		const {databases}                = await fetchDatabases();
-		const                     active = databases?.[getActiveDbIndex()];
-		nameEl.textContent               = active ? active.file_name : 'bookmarks.json';
-	} catch {
-		// Selector page will surface the real error; keep the header quiet.
-		nameEl.textContent = 'bookmarks.json';
 	}
 }
 

@@ -68,12 +68,6 @@ static int load_bookmark_json(const char *path, bookmark_cache_entry_t *entry)
 	entry->json[read] = '\0';
 	entry->json_len = read;
 
-	// Store canonical absolute path for reliable cache invalidation
-	if (!realpath(path, entry->path)) {
-		strncpy(entry->path, path, sizeof(entry->path) - 1);
-		entry->path[sizeof(entry->path) - 1] = '\0';
-	}
-
 	LOG_INFO("Loaded bookmark database: %s (%zu bytes)", path, entry->json_len);
 	return 0;
 }

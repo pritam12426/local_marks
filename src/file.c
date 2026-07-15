@@ -38,7 +38,7 @@ static void log_request(const char        *client_ip,
 	if (*vfs_path == '\0') vfs_path = "index.html";
 
 	if (bytes >= 0 && mime) {
-		LOG_INFO("%s:%d \"%s vfs:%s %s\" %d - (%lld bytes, %s)",
+		LOG_INFO("%s:%d \"%s VFS:%s %s\" %d - (%lld bytes, %s)",
 		         client_ip,
 		         client_port,
 		         http_method_str(req->method),
@@ -48,7 +48,7 @@ static void log_request(const char        *client_ip,
 		         bytes,
 		         mime);
 	} else {
-		LOG_INFO("%s:%d \"%s vfs:%s %s\" %d",
+		LOG_INFO("%s:%d \"%s VFS:%s %s\" %d",
 		         client_ip,
 		         client_port,
 		         http_method_str(req->method),
@@ -105,7 +105,7 @@ int file_serve(const HttpRequest *req,
 
 	/* Conditional GET: If-None-Match */
 	if (req->if_none_match[0] && strcmp(req->if_none_match, etag) == 0) {
-		LOG_INFO("%s:%d \"%s\" 304 (ETag match)", client_ip, client_port, req->path);
+		LOG_INFO("VFS:%s:%d \"%s\" 304 (ETag match)", client_ip, client_port, req->path);
 		char extra[256];
 		snprintf(extra, sizeof extra, "ETag: %s\r\n", etag);
 		response_send(t, 304, "Not Modified", NULL, extra, NULL, 0, keep_alive, 1);
@@ -114,7 +114,7 @@ int file_serve(const HttpRequest *req,
 		return 304;
 	}
 
-	LOG_INFO("%s:%d \"%s vfs:%s\" (%s, %zu bytes%s)",
+	LOG_INFO("%s:%d \"%s VFS:%s\" (%s, %zu bytes%s)",
 	         client_ip, client_port, http_method_str(req->method), vfs_path, mime, len,
 	         is_gzipped ? ", gzip" : "");
 

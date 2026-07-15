@@ -61,7 +61,7 @@ const ACTIVE_DB_KEY = 'localmarks-active-db';
 export function getActiveDbIndex()
 {
 	const v = localStorage.getItem(ACTIVE_DB_KEY);
-	return v ? parseInt(v, 10) : 0;
+	return v ? parseInt(v, 10) : null;
 }
 
 export function setActiveDbIndex(idx)

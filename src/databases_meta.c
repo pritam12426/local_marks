@@ -97,8 +97,7 @@ void populate_db_meta_all(const ServerConfig *cfg)
 		strncpy(meta->file_name, base, sizeof(meta->file_name) - 1);
 		meta->file_name[sizeof(meta->file_name) - 1] = '\0';
 
-		LOG_INFO("Registered bookmark DB[%d]: %s (%zu bytes, mode=%04o, mtime=%ld)",
-		         g_db_meta_count, path, (size_t)st.st_size, meta->mode, (long)st.st_mtime);
+		LOG_INFO("Registered bookmark DB[%d]: %s", g_db_meta_count, base);
 
 		g_db_meta_count++;
 	}

@@ -129,3 +129,33 @@ function openAll()
 {
 	lastPicked.forEach((bm, i) => { setTimeout(() => window.open(bm.url, '_blank'), i * 150); });
 }
+
+// Update the bookmarks pool when the active database changes
+export function updateRandomData(newData)
+{
+	const cats   = newData.book_Marks || newData.categories || [];
+	allBookmarks = cats.flatMap(
+	    c => (c.bookmarks || []).map(bm => ({...bm, _category: c.category || ''})));
+
+	// Refresh category dropdown
+	const catNames = [...new Set(allBookmarks.map(b => b._category).filter(Boolean))].sort();
+	elCat.innerHTML = '<option value="">All categories</option>';
+	catNames.forEach(name => {
+		const opt       = document.createElement('option');
+		opt.value       = name;
+		opt.textContent = name;
+		elCat.appendChild(opt);
+	});
+
+	// Refresh tag datalist
+	const allTags = [...new Set(allBookmarks.flatMap(b => b.tags || []))].sort();
+	const datalist = document.getElementById('tag-suggestions');
+	if (datalist) {
+		datalist.innerHTML = '';
+		allTags.forEach(t => {
+			const opt = document.createElement('option');
+			opt.value = t;
+			datalist.appendChild(opt);
+		});
+	}
+}

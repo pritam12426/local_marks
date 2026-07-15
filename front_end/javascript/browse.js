@@ -87,10 +87,11 @@ export function initBrowse(data)
 }
 
 // Call this when switching to a different database
-export function updateCategories(newCategories)
+export function updateCategories(newData)
 {
-	allCategories = newCategories;
-	
+	// Extract categories array from full JSON response
+	const allCategories = newData.book_Marks || newData.categories || [];
+
 	// Update sidebar and panel with new categories
 	initSidebar({
 		categories: allCategories,
@@ -98,22 +99,22 @@ export function updateCategories(newCategories)
 		catListEl: elCatList,
 		sidebarCountEl: elSidebarCount
 	});
-	
+
 	initPanel({
 		categories: allCategories,
 		activeCategory: 0,
 		panelTitleEl: elPanelTitle,
 		bookmarkListEl: elBookmarkList
 	});
-	
+
 	// Update search index for new data
 	searchSetCategories(allCategories);
-	
+
 	activeCategory = 0;
 	searchQuery = '';
 	elClear.classList.remove('visible');
 	elSearch.value = '';
-	
+
 	updateHeaderCount();
 	renderSidebarFn();
 	renderPanel();

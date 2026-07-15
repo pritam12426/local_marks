@@ -45,6 +45,8 @@ make
 ./local-mark bookmarks.json
 
 # 4. Open http://localhost:8080 in your browser
+#    → Lands on Database Selector page
+#    → Click a database to load it
 ```
 
 ---
@@ -177,14 +179,14 @@ title | url | description | tags
 
 ```bash
 ./local-mark bookmarks.json
-# → http://localhost:8080
+# → http://localhost:8080 (lands on Database Selector)
 ```
 
 ### Multiple Databases
 
 ```bash
 ./local-mark work.json personal.json learning.json
-# Serves all three; switch via header dropdown
+# Serves all three; switch via Database Selector page
 ```
 
 ### Common Options
@@ -202,6 +204,8 @@ title | url | description | tags
 | `--log-file`   | `-F`  | stderr          | Append logs to file                         |
 | `--threads`    | `-T`  | `2`             | Worker thread pool size                     |
 | `--keep-alive` | `-K`  | `3`             | Keep-alive timeout (seconds, 0 = disable)   |
+
+> **Note on `--keep-alive`**: Default is 3s for backward compat, but for a local tool TLS is not used so handshake cost is zero. Recommended: `-K 0` to disable (simpler, no idle connections tying up thread pool). Enable only when behind TLS-terminating reverse proxy.
 
 ### Examples
 
@@ -226,6 +230,14 @@ When you pass multiple `.json` files:
 ./local-mark db1.json db2.json db3.json
 ```
 
+### Startup Behavior
+
+1. Server starts with **no database loaded**
+2. Browser opens → **Database Selector page** (`#databases`)
+3. User clicks a database card
+4. Selection saved to `localStorage` (`localmarks-active-db`)
+5. Page navigates to `#browse` → **only then** fetches bookmarks for that DB
+
 ### API Endpoints
 
 | Endpoint                      | Description                              |
@@ -236,48 +248,18 @@ When you pass multiple `.json` files:
 | `GET /api/databases`          | List all databases with metadata         |
 | `GET /api/databases/0`        | Metadata for database 0                  |
 
-### Request Logging
-
-Enable detailed request logging with these flags:
-
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--print-request` | `-R` | Log each request with method, path, headers |
-| `--log-level=debug` | `-L debug` | Include request/response details |
-
-```bash
-# Log all requests to console
-./local-mark -R bookmarks.json
-
-# Log requests to file with timestamps
-./local-mark -R -L debug -F access.log bookmarks.json
-```
-
-Example log output:
-```
-[INFO ] 127.0.0.1:54321 "GET /bookmarks.json HTTP/1.1" 200 - (2410 bytes, application/json)
-[DEBUG] 127.0.0.1:54321 "GET /api/databases HTTP/1.1" 200 - (512 bytes, application/json)
-[DEBUG] --- Request from 127.0.0.1:54321 ---
-GET /bookmarks.json HTTP/1.1
-Host: localhost:8080
-User-Agent: curl/7.68.0
-Accept: */*
----
-```
-
-> **Note**: Use `-R` sparingly in production — it logs every request including headers.
-
-### Frontend Database Selector
+### Database Selector Page
 
 1. **Header indicator** — shows current database name (🛢️ icon)
-2. **Click indicator** or navigate to `#databases` — full selector page
+2. **Navigate to `#databases`** — full selector page
 3. **Database cards** show:
    - File name
    - Last modified (relative + absolute time)
    - Permissions + owner:group
    - "Current" badge on active database
-4. **Click a card** → saves to `localStorage`, reloads page with new data
+4. **Click a card** → saves to `localStorage`, navigates to `#browse` with new data
 5. **Persistence** — your choice survives browser restarts
+6. **Search/filter** — type in search box to filter databases by name or path
 
 ### Metadata Returned by `/api/databases`
 

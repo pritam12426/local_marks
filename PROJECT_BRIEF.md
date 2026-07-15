@@ -25,25 +25,25 @@
 ```
 ┌───────────────────────────────────────────────────────────────────────────────┐
 │                            main thread                                        │
-│  argp CLI → log_init → vfs_hash_init → header_cache_init                   │
-│       ↓                 ↓                  ↓                               │
-│  bookmark_cache_init → thread_pool_create                                    │
-│       ↓                                                                      │
-│  ratelimit_create (if --max-conns) → make_listener                           │
-│       ↓                                                                      │
+│  argp CLI → log_init → vfs_hash_init → header_cache_init                      │
+│       ↓                 ↓                  ↓                                  │
+│  bookmark_cache_init → thread_pool_create                                     │
+│       ↓                                                                       │
+│  ratelimit_create (if --max-conns) → make_listener                            │
+│       ↓                                                                       │
 │  accept() loop ────────────────────────────────────────────────────────────┐  │
 │       │                                                                    │  │
-│       ▼                                                                   │  │
+│                                                                           │  │
 │  transport_new() + ratelimit_accept() + thread_pool_submit()               │  │
 └─────────┼──────────────────────────────────────────────────────────────────┼──┘
           │                                                                  │
-          ▼                                                                 ▼
+                                                                            
 ┌──────────────────────────┐                                  ┌─────────────────────────┐
 │  thread pool (N workers) │                                  │  dedicated threads      │
 │  ┌─────┐ ┌─────┐ ┌─────┐ │                                  │  ┌──────────────────┐   │
 │  │ W1  │ │ W2  │ │ WN  │ │                                  │  │ log consumer     │   │
 │  └─────┘ └─────┘ └─────┘ │                                  │  │ (drains ring buf)│   │
-│        ▲        ▲      │                                  │  └──────────────────┘   │
+│        ▲        ▲        │                                  │  └──────────────────┘   │
 │        │        │        │                                  └─────────────────────────┘
 │  circular work queue     │
 │  (4096 slots, mutex +    │
@@ -51,25 +51,25 @@
 └──────────┬───────────────┘
            │
            │ Worker request handling:
-           ▼
+           
 ┌────────────────────────────────────────────────────────────────────────────────┐
 │                         WORKER THREAD (per connection)                         │
 │  ┌─────────────┐      ┌─────────────┐     ┌─────────────┐     ┌─────────────┐  │
-│  │ http_parse  │───▶ │ auth_check? │───▶│ api_handle  │───▶│   DONE      │  │
+│  │ http_parse  │───▶  │ auth_check? │───▶ │ api_handle  │───▶ │   DONE      │  │
 │  │ _request()  │      │ (401/OK)    │     │ _request()  │     │ (if API)    │  │
 │  └─────────────┘      └─────────────┘     └──────┬──────┘     └─────────────┘  │
-│                                                │                               │
-│                                                ▼ (not API)                    │
+│                                                  │                             │
+│                                                   (not API)                   │
 │                                        ┌─────────────────┐                     │
 │                                        │  file_serve()   │                     │
 │                                        │  (VFS lookup)   │                     │
 │                                        │  vfs_lookup()   │                     │
 │                                        │       │         │                     │
-│                                        │       ▼        │                     │
+│                                        │                │                     │
 │                                        │  vfs_entry*     │                     │
 │                                        │  (gzip data)    │                     │
 │                                        │       │         │                     │
-│                                        │       ▼        │                     │
+│                                        │                │                     │
 │                                        │ response_send() │                     │
 │                                        │ (writev + ETag  │                     │
 │                                        │  + Range +      │                     │
@@ -142,7 +142,7 @@ local_marks/
 │   ├── gen_embedded_front_end_dir.h  # Auto-generated: vfs_entry[] + extern arrays
 │   ├── header_cache.c / .h     # Pre-computed Date/Server/Connection headers
 │   ├── http.c / .h             # HTTP request parser (buffered, in-place)
-│   ├── log.c / .h              # Lock-free ring logger (SPSC, consumer thread)
+│   ├── log.c / .h              # Lock-free SPSC ring logger
 │   ├── main.c                  # Entry: argp CLI, validation, startup
 │   ├── mime.c / .h             # Extension → MIME lookup
 │   ├── project_config.h        # VERSION, BINARY_NAME, HOMEPAGE_URL
@@ -341,8 +341,9 @@ All return `application/json; charset=utf-8` with `Cache-Control: no-cache`.
   - Icon + file_name + relative time (e.g. "2 hour ago")
   - Permissions string + `user:group` + absolute timestamp
   - "Current" badge for active database
-- `selectDatabase(idx, isActive)` — saves to localStorage, reloads page on switch
-- Format helpers: `relativeTime()`, `absoluteTime()`, `permString(mode)`
+- `selectDatabase(idx, isActive)` — saves to localStorage, navigates to browse (loads new DB)
+
+Format helpers: `relativeTime()`, `absoluteTime()`, `permString(mode)`
 
 ### 4.16 `mime.c` — MIME Lookup
 
@@ -591,16 +592,141 @@ sudo make install PREFIX=~/.local  # ~/.local/bin
 - `#random` — Random link picker with filters
 - `#databases` — Database selector page (cards with metadata, switch workspace)
 
-**Key JS modules:**
+### 15.1 JavaScript Modules (`front_end/javascript/`)
 
-- `data.js` — IndexedDB cache (per-database keys `bookmarks:<idx>`), `fetchBookmarks(idx?)`, `fetchDatabases()`, `getActiveDbIndex()`, `setActiveDbIndex()`, favorites/theme/layout persistence
-- `databases.js` — Database selector UI: renders cards with file_name, mtime, permissions, owner/group; click to switch (reloads page)
-- `browse.js` — Category rendering, search, tag filtering, bookmark cards
-- `info.js` — Statistics computation, charts, domain grid
-- `random.js` — Random selection with category/tag filters
-- `main.js` — Hash router, init, database selector integration, header DB indicator (`db-indicator`)
+| Module         | Purpose                                                                        | Key Exports                                                                                                                                                                                                                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main.js`      | Entry point, hash router, boot sequence, DB indicator                          | `init()`, `renderRoute()`, `updateDbIndicator()`                                                                                                                                                                                                                                                                              |
+| `data.js`      | Shared data layer: fetch, IndexedDB cache, favorites, theme, layout, active DB | `fetchBookmarks(idx?)`, `fetchDatabases()`, `getActiveDbIndex()`, `setActiveDbIndex()`, `getActiveDbName()`, `getFavorites()`, `toggleFavorite()`, `isFavorite()`, `initTheme()`, `toggleTheme()`, `getTheme()`, `setTheme()`, `getLayout()`, `setLayout()`, `getSidebarWidth()`, `setSidebarWidth()`, `buildCard()`, `esc()` |
+| `browse.js`    | Browse view orchestration: sidebar, panel, search, tag bar, keyboard           | `initBrowse(data)`, `renderBrowse()`, `updateCategories(newData)`                                                                                                                                                                                                                                                             |
+| `sidebar.js`   | Category sidebar rendering & events (click, keyboard, favorites)               | `initSidebar(cfg)`, `renderSidebar()`, `getActiveCategory()`, `setActiveCategory()`, `highlightSidebar()`                                                                                                                                                                                                                     |
+| `panel.js`     | Main panel: renders bookmark cards for active category/favorites + tag bar     | `initPanel(cfg)`, `renderPanel()`, `getActiveCategory()`, `setActiveCategory()`, `clearActiveTags()`, `notifyCategoriesChanged()`                                                                                                                                                                                             |
+| `search.js`    | Search index + results rendering (grouped by category)                         | `initSearch(cfg)`, `renderSearch(query)`, `clearSearch()`, `setCategories(cats)`, `rebuildIndex()`                                                                                                                                                                                                                            |
+| `tag_bar.js`   | Tag filter pills UI (click to toggle, expand/collapse, clear all)              | `initTagBar(el)`, `renderTagBar(tags)`, `getActiveTags()`, `setActiveTags()`, `toggleExpanded()`, `isExpanded()`                                                                                                                                                                                                              |
+| `keyboard.js`  | Vim-style shortcuts (j/k, h/l, gg/G, /, Enter, o, yy, p, ?, Esc)               | `initKeyboard(cfg)`, `refreshCards()`, `focusFirstCard()`, `focusLastCard()`, `focusNextCard()`, `focusPrevCard()`, `blurCards()`, `focusSidebar()`                                                                                                                                                                           |
+| `databases.js` | Database selector page: cards with metadata, search, keyboard nav, switch DB   | `initDatabaseSelector()`, `renderDatabaseSelector()`, `selectDatabase(idx, isActive)`                                                                                                                                                                                                                                         |
+| `info.js`      | Info view: stats strip, category chart, tag cloud, domain grid                 | `renderInfo(data)`                                                                                                                                                                                                                                                                                                            |
+| `random.js`    | Random view: picker with count/category/tag filters, open all                  | `initRandom(data)`, `renderRandom()`                                                                                                                                                                                                                                                                                          |
 
-**Service Worker** (`sw.js`): Offline support for embedded assets.
+### 15.2 CSS (`front_end/stylesheet/`)
+
+| File               | Purpose                                                                     |
+| ------------------ | --------------------------------------------------------------------------- |
+| `style.css`        | Main styles (dark theme, CSS variables for theming), responsive breakpoints |
+| `themes/light.css` | Light theme overrides via `[data-theme="light"]`                            |
+
+### 15.3 HTML & Assets
+
+| File          | Purpose                                                                               |
+| ------------- | ------------------------------------------------------------------------------------- |
+| `index.html`  | SPA shell: header (search, layout toggle, DB switcher, theme toggle), 4 view sections |
+| `favicon.ico` | Site icon (served via VFS)                                                            |
+| `sw.js`       | Service Worker for offline caching of embedded assets                                 |
+
+### 15.4 JSON Data Schema
+
+**Input to `marks2json`** (pipe-delimited `.txt`):
+
+```
+title | url | description | #tag1 #tag2
+```
+
+**Output (`bookmarks.json`):**
+
+```json
+{
+  "book_Marks": [
+    {
+      "category": "Category Name",
+      "bookmarks": [
+        {
+          "title": "Display Title",
+          "url": "https://example.com",
+          "description": "Optional description",
+          "tags": ["#tag1", "#tag2"],
+          "domain": "example.com",
+          "icon": "https://..."   // YouTube channels only, with --icon
+        }
+      ]
+    }
+  ],
+  "book_mark_domain_hash": { "example.com": 42 },
+  "book_mark_tag_hash": { "#tag1": 10, "#tag2": 5 }
+}
+```
+
+| Field                   | Type         | Description                                 |
+| ----------------------- | ------------ | ------------------------------------------- |
+| `book_Marks`            | `Category[]` | Array of categories (order preserved)       |
+| `Category.category`     | `string`     | Category name (from filename)               |
+| `Category.bookmarks`    | `Bookmark[]` | Bookmarks in this category                  |
+| `Bookmark.title`        | `string`     | Display title (fallback: URL)               |
+| `Bookmark.url`          | `string`     | Absolute URL (must have http/https)         |
+| `Bookmark.description`  | `string`     | Optional description                        |
+| `Bookmark.tags`         | `string[]`   | Tags without `#` prefix in JSON             |
+| `Bookmark.domain`       | `string`     | Extracted hostname (no `www.`)              |
+| `Bookmark.icon`         | `string?`    | YouTube channel avatar URL                  |
+| `book_mark_domain_hash` | `object`     | Domain → count across all bookmarks         |
+| `book_mark_tag_hash`    | `object`     | Tag (with `#`) → count across all bookmarks |
+
+### 15.5 API Endpoints Consumed by Frontend
+
+| Endpoint                | Method | Response                              | Used By                           |
+| ----------------------- | ------ | ------------------------------------- | --------------------------------- |
+| `/api/databases`        | GET    | `{ databases: DBMeta[], count: int }` | `databases.js` → selector page    |
+| `/api/databases/<idx>`  | GET    | `DBMeta`                              | (future: single DB detail)        |
+| `/bookmarks.json`       | GET    | Full JSON of first DB                 | Backward compat                   |
+| `/bookmarks/<idx>.json` | GET    | Full JSON of DB at index              | `data.js` → `fetchBookmarks(idx)` |
+
+**DBMeta fields:**
+
+```json
+{
+  "mode": "0644",
+  "absolute_path": "/full/path/db.json",
+  "file_name": "db.json",
+  "file_size": 2410,
+  "cTime": 1700000000,
+  "bTime": 1690000000,
+  "user": "pritam",
+  "group": "staff",
+  "mTime_sec": 1700000000,
+  "mTime_nsec": 123456789
+}
+```
+
+### 15.6 Persistence (localStorage)
+
+| Key                    | Value                                          |
+| ---------------------- | ---------------------------------------------- |
+| `localmarks-favorites` | `string[]` — starred URLs                      |
+| `localmarks-layout`    | `"single" \| "grid" \| "compact"`              |
+| `localmarks-sidebar-w` | `number` — sidebar width in px                 |
+| `localmarks-theme`     | `"dark" \| "light"`                            |
+| `localmarks-active-db` | `string` — database index (e.g., `"0"`, `"1"`) |
+
+### 15.7 IndexedDB Cache
+
+- **Database**: `LocalMarksCache`
+- **Store**: `bookmarks` (keyPath: `id`)
+- **Keys**: `bookmarks:0`, `bookmarks:1`... per database index
+- **Value**: `{ id, data, timestamp }`
+- **Strategy**: Stale-while-revalidate — returns cached immediately, fetches fresh in background
+
+### 15.8 Lazy DB Loading
+
+On first visit, shows Database Selector (**no bookmark API call**). User picks a DB → saves index to localStorage → navigates to browse → **only then** fetches `/bookmarks/<idx>.json`. Switching DBs fetches new one in place (no full reload).
+
+---
+
+## 16. Database Switching Flow
+
+1. User lands on `#databases` → `renderDatabaseSelector()` calls `fetchDatabases()` → shows cards
+2. User clicks card → `selectDatabase(idx)` calls `setActiveDbIndex(idx)` + `location.hash = '#browse'`
+3. Router (`renderRoute`) for `#browse` → calls `ensureDataLoaded()`
+4. `ensureDataLoaded()` checks `getActiveDbIndex()` → calls `fetchBookmarks(idx)`
+5. On success: `initBrowse(data)` / `updateCategories(data)` → renders view
+6. Subsequent visits use cached IndexedDB (stale-while-revalidate)
 
 ---
 

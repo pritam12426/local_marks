@@ -35,7 +35,7 @@ Source of truth is `src/main.c` (differs from README):
 | `--port`          | `-P`  | `PORT`    | TCP port (default 8080)                                |
 | `--host`          | `-H`  | `HOST`    | Bind address (default localhost)                       |
 | `--threads`       | `-T`  | `NUM`     | Thread pool size (default 2)                           |
-| `--Keep-alive`    | `-K`  | `SECS`    | Keep-alive timeout in seconds (default 3, 0 = disable) |
+| `--keep-alive`    | `-K`  | `SECS`    | Keep-alive timeout in seconds (default 3, 0 = disable) |
 | `--max-conns`     | `-M`  | `NUM`     | Max concurrent conns per IP (0 = unlimited)            |
 | `--browser`       | `-B`  | `BROWSER` | Browser to open on startup                             |
 
@@ -62,7 +62,7 @@ Positional `<DB_FILE(s)>...` required (max 10, set in `common.h`).
 | `src/project_config.h`                    | Version, name, metadata                                 |
 | `front_end/`                              | Static SPA (`index.html`, `javascript/`, `stylesheet/`) |
 | `front_end/embed_frontend.bash`           | Script: xxd per-file → C arrays + vfs_entry table       |
-| `marks2json.py`                           | Python converter: `create`/`update` subcommands         |
+| `marks2json.py`                           | Python converter: `create`/`update`/`find-dead` subcommands |
 | `DEV.md`                                  | Detailed architecture docs (from live_server reference) |
 
 ## Architecture
@@ -74,6 +74,16 @@ optionally loops for keep-alive.
 
 Key lookup: `vfs_lookup("index.html")` returns an embedded `vfs_entry`
 from the hash table (no filesystem access for frontend files).
+
+## Database Loading Behavior (Current)
+
+**Lazy loading** — no database is loaded at startup.
+
+1. Server starts → shows **Database Selector page** (`#databases`)
+2. User clicks a database card
+3. Selection saved to `localStorage` (`localmarks-active-db`)
+4. Navigates to `#browse` → **only then** fetches `/bookmarks/<idx>.json`
+5. Switching databases fetches new one in place (no full reload)
 
 ## Workflow
 

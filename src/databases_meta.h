@@ -6,12 +6,6 @@
 #include <stddef.h>
 #include <sys/stat.h>
 
-#if !defined(PATH_MAX) && defined(_POSIX_PATH_MAX)
-#define PATH_MAX _POSIX_PATH_MAX
-#elif !defined(PATH_MAX)
-#define PATH_MAX 4096
-#endif
-
 #include "common.h"
 #include "server.h"
 

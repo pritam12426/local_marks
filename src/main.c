@@ -38,6 +38,7 @@ static struct argp_option options[] = {
 	{ "threads",    'T', "NUM",   0,  "Thread pool size (default: 2)",                              3 },
 	{ "keep-alive", 'K', "SECS",  0,  "Keep-alive timeout in seconds (default: 3, 0 = disable)",   3 },
 	{ "max-conns",  'M', "NUM",   0,  "Max concurrent connections per IP (default: 0 = unlimited)", 3 },
+	{ "browser", 'B', "BROWSER", 0,  "Open page in BROWSER on startup (e.g. firefox)",              3 },
 
 	{ 0 }
 };
@@ -75,6 +76,7 @@ static Arguments G_Args = {
 
 	.log_file        = NULL, // NULL => stderr
 	.print_request   = false,
+	.browser         = NULL,
 	.log_level       = LOG_LEVEL_INFO,
 
 	.bookmark_file_count = 0,

@@ -311,15 +311,12 @@ function handleDbListKeys(e)
 function selectDatabase(idx, isActive)
 {
 	if (isActive) {
-		// Already the active DB — just go browse it, no need to reload.
+		// Already the active DB — just go browse it.
 		location.hash = '#browse';
 		return;
 	}
-	// Every view module caches the previously-loaded categories/state at
-	// init time, so hot-swapping the dataset safely would mean threading a
-	// reload through browse/search/sidebar/panel/random/info all at once.
-	// A full reload is simpler and avoids a whole class of stale-state
-	// bugs — this is a "switch workspace" action, not a frequent one.
+	// Set the active DB index and navigate to browse.
+	// main.js's renderRoute will handle loading the new database.
+	setActiveDbIndex(idx);
 	location.hash = '#browse';
-	location.reload();
 }

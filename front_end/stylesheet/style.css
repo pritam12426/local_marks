@@ -128,38 +128,6 @@ a {
 	border-color: var(--accent);
 }
 
-/* ── Header database indicator ── */
-
-.db-indicator {
-	display:       flex;
-	align-items:   center;
-	gap:           6px;
-	font-size:     11px;
-	font-weight:   600;
-	font-family:   var(--font-mono);
-	color:         var(--muted);
-	background:    var(--surface2);
-	border:        1px solid var(--border);
-	border-radius: 20px;
-	padding:       4px 12px 4px 8px;
-	max-width:     180px;
-	transition:    color var(--transition), border-color var(--transition), background var(--transition);
-}
-
-.db-indicator:hover {
-	color:        var(--accent);
-	border-color: var(--accent);
-	background:   var(--accent-glow);
-}
-
-.db-indicator-icon { flex-shrink: 0; }
-
-.db-indicator-name {
-	overflow:      hidden;
-	text-overflow: ellipsis;
-	white-space:   nowrap;
-}
-
 /* ── Layout toggle ── */
 
 .layout-toggle {
@@ -1244,25 +1212,17 @@ body.sidebar-resizing .main-panel {
 /* ── Database selector page ── */
 
 .db-select-body {
-	max-width: 760px;
-	margin:    0 auto;
-	padding:   48px 28px 60px;
+	max-width:  760px;
+	margin:     0 auto;
+	padding:    48px 28px 60px;
+	position:   relative;
 }
 
-.db-select-hero {
-	display:       flex;
-	align-items:   center;
-	gap:           28px;
-	margin-bottom: 48px;
-}
-
-.db-select-hero-img {
-	width:         104px;
-	height:        104px;
-	border-radius: var(--radius);
-	object-fit:    cover;
-	flex-shrink:   0;
-	box-shadow:    0 12px 30px rgba(0, 0, 0, 0.35);
+/* Subtle dotted background so the page doesn't feel so empty */
+body.route-databases {
+	background-image:     radial-gradient(var(--border) 1px, transparent 1px);
+	background-size:      22px 22px;
+	background-position: -11px -11px;
 }
 
 .db-select-hero-title {
@@ -1387,34 +1347,26 @@ body.sidebar-resizing .main-panel {
 .db-select-header {
 	display:         flex;
 	align-items:     center;
-	justify-content: space-between;
-	gap:             12px;
+	gap:             16px;
 	margin-bottom:   16px;
 	padding-bottom:  12px;
 	border-bottom:   1px solid var(--border);
 }
 
-.db-select-title {
-	font-size:   24px;
-	font-weight: 700;
-	color:       var(--text);
-	margin:      0;
+.db-select-header img {
+	border-radius: var(--radius-sm);
+	flex-shrink:   0;
 }
 
-.db-select-theme-toggle {
-	font-size:   16px;
-	background:  var(--surface);
-	border:      1px solid var(--border);
-	border-radius: 20px;
-	padding:     5px 10px;
-	cursor:      pointer;
-	color:       var(--muted);
-	transition:  color var(--transition), border-color var(--transition);
+.db-select-header .db-select-hero-title {
+	flex: 1;
 }
 
-.db-select-theme-toggle:hover {
-	color:       var(--accent);
-	border-color: var(--accent);
+.db-select-header-right {
+	display:     flex;
+	align-items: center;
+	gap:         8px;
+	flex-shrink: 0;
 }
 
 .db-select-search-wrap {
@@ -1455,44 +1407,6 @@ body.sidebar-resizing .main-panel {
 	color: var(--muted2);
 }
 
-.db-select-clear-btn {
-	position:      absolute;
-	right:         12px;
-	background:    none;
-	border:        none;
-	color:         var(--muted);
-	font-size:     13px;
-	cursor:        pointer;
-	padding:       4px 6px;
-	border-radius: var(--radius-xs);
-	transition:    color var(--transition);
-	display:       none;
-}
-
-.db-select-clear-btn.visible {
-	display: block;
-}
-
-.db-select-clear-btn:hover {
-	color: var(--text);
-}
-
-.db-select-error {
-	color:         #f87171;
-	background:    rgba(248, 113, 113, 0.1);
-	border:        1px solid rgba(248, 113, 113, 0.35);
-	border-radius: var(--radius-sm);
-	padding:       12px 16px;
-	font-size:     13px;
-	margin-bottom: 24px;
-}
-
-.db-select-list {
-	display:        flex;
-	flex-direction: column;
-	gap:            18px;
-}
-
 /* === Responsive for database selector === */
 
 @media (max-width: 768px) {
@@ -1501,8 +1415,8 @@ body.sidebar-resizing .main-panel {
 		align-items: flex-start;
 		gap: 8px;
 	}
-	
-	.db-select-title {
+
+	.db-select-hero-title {
 		font-size: 20px;
 	}
 }
@@ -1661,13 +1575,11 @@ body.sidebar-resizing .main-panel {
 	.logo-link img    { width: 28px; }
 	.header-right     { gap: 4px; }
 	.info-btn         { font-size: 10px; padding: 3px 8px; }
-	.db-indicator     { max-width: 34px; padding: 4px 6px; }
-	.db-indicator-name { display: none; }
 
 	.db-select-body     { padding: 32px 16px 40px; }
-	.db-select-hero     { flex-direction: column; align-items: flex-start; gap: 16px; margin-bottom: 32px; }
-	.db-select-hero-img { width: 72px; height: 72px; }
-	.db-select-hero-title { font-size: 24px; }
+	.db-select-header   { flex-wrap: wrap; }
+	.db-select-header img { width: 40px; }
+	.db-select-hero-title { font-size: 22px; }
 	.db-card            { padding: 16px 18px; }
 	.db-card-name       { font-size: 16px; }
 	.db-card-meta       { flex-direction: column; align-items: flex-start; gap: 4px; }
