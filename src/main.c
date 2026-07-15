@@ -140,6 +140,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		G_Args.max_conns = (int)val;
 		break;
 	}
+	case 'R':
+		G_Args.print_request = true;
+		break;
 
 	case ARGP_KEY_ARG:
 		// Collect positional bookmark file paths

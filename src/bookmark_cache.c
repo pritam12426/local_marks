@@ -173,17 +173,8 @@ const char *get_cached_bookmark_json(const char *path)
 		return entry->json;
 	}
 
-	pthread_mutex_unlock(&g_bookmark_cache_mutex);
-	return NULL;
-}
-
-size_t get_cached_bookmark_json_len(void)
-{
-	// Return length of the last accessed database (index 0 if available)
-	if (g_db_cache_count > 0 && g_db_cache[0].json) {
-		return g_db_cache[0].json_len;
-	}
-	return 0;
+pthread_mutex_unlock(&g_bookmark_cache_mutex);
+	return entry->json;
 }
 
 const char *get_cached_bookmark_json_by_index(int index)

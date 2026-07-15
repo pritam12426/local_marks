@@ -17,8 +17,8 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include <sys/uio.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 
 typedef struct Transport Transport;
 
@@ -45,7 +45,7 @@ void transport_destroy(Transport **t);
 int transport_set_timeout(Transport *t, int seconds);
 
 // Accessors
-int  transport_fd(const Transport *t);
+int transport_fd(const Transport *t);
 bool transport_is_tls(const Transport *t);
 
 

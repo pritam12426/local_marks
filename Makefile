@@ -17,48 +17,8 @@ UNAME_S := $(shell uname -s)
 
 PREFIX ?= /usr/local
 MANPREFIX ?= $(PREFIX)/share/man
-
 STRIP ?= strip
 INSTALL ?= install
-
-BUILD       =  build
-MARKS2JSON  =  marks2json.py
-BIN         =  local-mark
-
-HEADERS   = $(wildcard src/*.h)
-SRC      := $(wildcard src/*.c)
-
-FRONT_END_FILES = \
-    front_end/javascript/browse.js \
-    front_end/javascript/data.js \
-    front_end/javascript/info.js \
-    front_end/javascript/keyboard.js \
-    front_end/javascript/main.js \
-    front_end/javascript/panel.js \
-    front_end/javascript/random.js \
-    front_end/javascript/search.js \
-    front_end/javascript/sidebar.js \
-    front_end/javascript/tag_bar.js \
-    front_end/stylesheet/style.css \
-    front_end/stylesheet/themes/light.css \
-    front_end/favicon.ico \
-    front_end/index.html \
-    front_end/sw.js
-
-FRONT_END_SCRIPT       = front_end/embed_frontend.bash
-FRONT_END_GENERATED_C  = $(BUILD)/gen_embedded_front_end_dir.c
-FRONT_END_GENERATED_H  = src/gen_embedded_front_end_dir.h
-FRONT_END_GENERATED_O  = $(BUILD)/gen_embedded_front_end_dir.o
-
-# Compiler warnings
-CFLAGS +=  -Wall -Wextra -Wpedantic \
-           -Wstrict-prototypes -Wmissing-prototypes \
-           -Wshadow -Wconversion \
-           -Wno-missing-field-initializers
-
-# Common flags
-CFLAGS += -Isrc -std=c17 -DLOG_SHOW_TIME_STAMP
-LDLIBS +=  -lpthread
 
 # Convert targets to flags for backwards compatibility
 O_DEBUG := 0  # Debug binary (0 = release, 1 = debug)
@@ -91,7 +51,48 @@ else
 	CFLAGS += -D_GNU_SOURCE
 endif
 
+BUILD       =  build
+MARKS2JSON  =  marks2json.py
+BIN         =  local-mark
+
+
+FRONT_END_FILES = \
+    front_end/javascript/browse.js \
+    front_end/javascript/data.js \
+    front_end/javascript/databases.js \
+    front_end/javascript/info.js \
+    front_end/javascript/keyboard.js \
+    front_end/javascript/main.js \
+    front_end/javascript/panel.js \
+    front_end/javascript/random.js \
+    front_end/javascript/search.js \
+    front_end/javascript/sidebar.js \
+    front_end/javascript/tag_bar.js \
+    front_end/stylesheet/style.css \
+    front_end/stylesheet/themes/light.css \
+    front_end/favicon.ico \
+    front_end/index.html \
+    front_end/sw.js
+
+FRONT_END_SCRIPT       = front_end/embed_frontend.bash
+FRONT_END_GENERATED_C  = $(BUILD)/gen_embedded_front_end_dir.c
+FRONT_END_GENERATED_H  = src/gen_embedded_front_end_dir.h
+FRONT_END_GENERATED_O  = $(BUILD)/gen_embedded_front_end_dir.o
+
+# Compiler warnings
+CFLAGS +=  -Wall -Wextra -Wpedantic \
+           -Wstrict-prototypes -Wmissing-prototypes \
+           -Wshadow -Wconversion \
+           -Wno-missing-field-initializers
+
+# Common flags
+CFLAGS += -Isrc -std=c17 -DLOG_SHOW_TIME_STAMP
+LDLIBS +=  -lpthread
+
+HEADERS   = $(wildcard src/*.h)
+SRC      := $(wildcard src/*.c)
 OUT = $(SRC:%.c=$(BUILD)/%.o)
+
 
 all: $(BIN)
 
@@ -124,8 +125,11 @@ debug: $(BIN) ## Build the debug binary run `make debug -B O_DEBUG=1`
 
 install: all ## Install the local-mark binary
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(PREFIX)/bin
-	$(INSTALL) -m 0755 $(BIN) $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL) -m 0755 $(BIN) $(DESTDIR)$(PREFIX)/bin/$(BIN)
 	$(INSTALL) -m 0755 $(MARKS2JSON) $(DESTDIR)$(PREFIX)/bin/marks2json
+
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(MANPREFIX)/man1
+	$(INSTALL) -m 0755 local-mark.1 $(DESTDIR)$(MANPREFIX)/man1/$(BIN).1
 
 clean: ## Clean up build artifacts
 	$(RM) -rf $(OUT) $(BIN) $(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_H)

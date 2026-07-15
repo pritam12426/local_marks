@@ -17,9 +17,6 @@ void bookmark_cache_add_db(const char *path);
 // Returns pointer to cached buffer (valid until next reload), or NULL on error.
 const char *get_cached_bookmark_json(const char *path);
 
-// Get length of currently cached bookmark JSON for the last accessed path
-size_t get_cached_bookmark_json_len(void);
-
 // Get cached bookmark JSON for a specific database by index.
 // Returns pointer to cached buffer, or NULL on error.
 const char *get_cached_bookmark_json_by_index(int index);

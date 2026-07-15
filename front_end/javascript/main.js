@@ -6,20 +6,20 @@
 
 import {
 	fetchBookmarks,
-	fetchDatabases,
-	switchDatabase,
 	getLayout,
 	setLayout,
 	initTheme,
 	getSidebarWidth,
-	setSidebarWidth
+	setSidebarWidth,
+	getActiveDbIndex,
+	fetchDatabases
 } from './data.js';
 
 import {initBrowse, renderBrowse} from './browse.js';
 import {renderInfo} from './info.js';
 import {initRandom, renderRandom} from './random.js';
+import {initDatabaseSelector, renderDatabaseSelector} from './databases.js';
 let data = null;
-let databases = [];
 
 // ── Boot ───────────────────────────────────
 
@@ -29,10 +29,12 @@ async function init()
 		initTheme();
 		initLayoutToggle();
 		initSidebarResizer();
-		await initDatabaseSelector();
 	} catch (err) {
 		console.error('❌ Init error:', err);
 	}
+
+	initDatabaseSelector();
+	updateDbIndicator();
 
 	try {
 		data = await fetchBookmarks();
@@ -41,8 +43,10 @@ async function init()
 		document.getElementById('bookmark-list').innerHTML = `
 			<div class="state-empty">
 				<div class="state-icon">❌</div>
-				<p>Could not load <code>bookmarks.json</code>.</p>
+				<p>Could not load this database.</p>
+				<button class="state-action" onclick="location.hash='#databases'">🛢️ Choose a different database</button>
 			</div>`;
+		bootRouter();
 		return;
 	}
 
@@ -52,79 +56,19 @@ async function init()
 	// Register service worker for offline support
 	if ('serviceWorker' in navigator) {
 		navigator.serviceWorker.register('/sw.js')
-		    .then(reg => console.log('✅ Service Worker registered:', reg.scope))
-		    .catch(err => console.warn('⚠️ Service Worker registration failed:', err));
+			.then(reg => console.log('✅ Service Worker registered:', reg.scope))
+			.catch(err => console.warn('⚠️ Service Worker registration failed:', err));
 	}
 
+	bootRouter();
+}
+
+function bootRouter()
+{
 	window.addEventListener('hashchange', renderRoute);
 	if (!location.hash || location.hash === '#')
 		location.hash = '#browse';
 	renderRoute();
-}
-
-// ── Database selector ──────────────────────
-
-async function initDatabaseSelector()
-{
-	const select = document.getElementById('db-select');
-	if (!select) return;
-
-	try {
-		const res = await fetch('/api/databases', {cache: 'no-cache'});
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
-		const result = await res.json();
-		databases = result.databases || [];
-	} catch (err) {
-		console.warn('⚠️ Failed to fetch database list:', err);
-		databases = [];
-	}
-
-	// Populate select
-	select.innerHTML = '';
-	if (databases.length <= 1) {
-		// Hide selector if only one database
-		const selector = document.getElementById('db-selector');
-		if (selector) selector.style.display = 'none';
-		return;
-	}
-
-	databases.forEach((db, idx) => {
-		const opt = document.createElement('option');
-		opt.value = idx;
-		opt.textContent = db.file_name || `Database ${idx + 1}`;
-		select.appendChild(opt);
-	});
-
-	// Restore saved selection
-	const savedIdx = localStorage.getItem('localmarks-db-index');
-	if (savedIdx !== null && parseInt(savedIdx, 10) < databases.length) {
-		select.value = savedIdx;
-	}
-
-	select.addEventListener('change', async (e) => {
-		const idx = parseInt(e.target.value, 10);
-		if (isNaN(idx) || idx >= databases.length) return;
-		localStorage.setItem('localmarks-db-index', idx);
-		await loadDatabase(idx);
-	});
-
-	// Load initial database if not the first one
-	if (select.value && parseInt(select.value, 10) > 0) {
-		await loadDatabase(parseInt(select.value, 10));
-	}
-}
-
-async function loadDatabase(index)
-{
-	try {
-		const newData = await switchDatabase(index);
-		data = newData;
-		initBrowse(data);
-		initRandom(data);
-		renderRoute();  // Re-render current view with new data
-	} catch (err) {
-		console.error('❌ Failed to switch database:', err);
-	}
 }
 
 // ── Layout toggle ──────────────────────────
@@ -234,6 +178,7 @@ function initSidebarResizer()
 }
 
 
+
 // ── Router ─────────────────────────────────
 
 function renderRoute()
@@ -257,14 +202,20 @@ function renderRoute()
 	const mainContent = document.getElementById('main-panel')
 	                    || document.querySelector('.main-panel')
 	                    || document.querySelector('.info-body')
-	                    || document.querySelector('.random-body');
+	                    || document.querySelector('.random-body')
+	                    || document.querySelector('.db-select-body');
 	if (mainContent && document.activeElement !== document.getElementById('search-input')) {
 		mainContent.setAttribute('tabindex', '-1');
 		mainContent.focus({preventScroll: true});
 	}
 
 	// Update header title
-	const titles = {browse: 'LocalMarks', info: 'Database Info', random: '🎲 Random Links'};
+	const titles = {
+		browse: 'LocalMarks',
+		info: 'Database Info',
+		random: '🎲 Random Links',
+		databases: '🛢️ Select Database'
+	};
 	const h1     = document.getElementById('header-title');
 	if (h1)
 		h1.textContent = titles[route] || 'LocalMarks';
@@ -276,16 +227,42 @@ function renderRoute()
 
 	switch (route) {
 	case 'browse':
+		if (!data)
+			break; // boot failed to load a database — error message already shown
 		if (qParams.has('q'))
 			document.getElementById('search-input').value = qParams.get('q');
 		renderBrowse();
 		break;
 	case 'info':
+		if (!data)
+			break;
 		renderInfo(data);
 		break;
 	case 'random':
+		if (!data)
+			break;
 		renderRandom();
 		break;
+	case 'databases':
+		renderDatabaseSelector();
+		break;
+	}
+}
+
+// ── Header database indicator ──────────────
+
+async function updateDbIndicator()
+{
+	const nameEl = document.getElementById('db-indicator-name');
+	if (!nameEl)
+		return;
+	try {
+		const {databases} = await fetchDatabases();
+		const active       = databases?.[getActiveDbIndex()];
+		nameEl.textContent = active ? active.file_name : 'bookmarks.json';
+	} catch {
+		// Selector page will surface the real error; keep the header quiet.
+		nameEl.textContent = 'bookmarks.json';
 	}
 }
 

@@ -16,7 +16,7 @@ typedef struct Transport Transport;
 typedef enum {
 	HTTP_GET  = 0,
 	HTTP_HEAD = 1,
-	HTTP_OTHER,          // Anything we don't support (POST, PUT, etc.)
+	HTTP_OTHER,  // Anything we don't support (POST, PUT, etc.)
 } HttpMethod;
 
 // Parsed HTTP request — all fields are null-terminated strings
@@ -38,8 +38,8 @@ typedef struct {
 	int64_t    range_start;            // Range start (-1 = not specified / suffix)
 	int64_t    range_end;              // Range end   (-1 = open-ended)
 
-	char       raw[8192];             // Raw request data (request line + all headers)
-	size_t     raw_len;               // Length of raw data
+	char       raw[8192];              // Raw request data (request line + all headers)
+	size_t     raw_len;                // Length of raw data
 } HttpRequest;
 
 // Parse a complete HTTP request from the transport

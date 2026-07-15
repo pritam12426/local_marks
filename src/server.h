@@ -12,11 +12,11 @@ typedef struct {
 	const char *user;
 	const char *pass;
 
-	bool    print_request;
+	bool        print_request;
 	const char *browser;
 
 	const char *bookmark_files[MAX_BOOKMARK_FILES];
-	int           bookmark_file_count;
+	int         bookmark_file_count;
 
 	int thread_pool_size;
 	int keep_alive_timeout;

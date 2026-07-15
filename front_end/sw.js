@@ -2,7 +2,7 @@
 // sw.js  —  Service Worker for offline support
 // =============================================
 
-const CACHE_NAME = 'localmarks-v1';
+const CACHE_NAME = 'localmarks-v2';
 const STATIC_ASSETS = [
 	'/',
 	'/index.html',
@@ -18,6 +18,7 @@ const STATIC_ASSETS = [
 	'/javascript/keyboard.js',
 	'/javascript/info.js',
 	'/javascript/random.js',
+	'/javascript/databases.js',
 	'/stylesheet/style.css',
 	'/stylesheet/themes/light.css'
 ];
@@ -51,8 +52,11 @@ self.addEventListener('fetch', event => {
 	// Only handle same-origin requests
 	if (url.origin !== location.origin) return;
 
-	// Network-first for bookmarks.json (always want fresh data)
-	if (url.pathname === '/bookmarks.json') {
+	// Network-first for anything that can change server-side: whichever
+	// database is being served, and the databases metadata API.
+	const isDbFile = url.pathname === '/bookmarks.json' || /^\/bookmarks\/\d+\.json$/.test(url.pathname);
+	const isDbApi  = url.pathname.startsWith('/api/databases');
+	if (isDbFile || isDbApi) {
 		event.respondWith(networkFirst(request));
 		return;
 	}

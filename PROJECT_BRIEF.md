@@ -117,6 +117,7 @@ local_marks/
 │   ├── javascript/             # ES Modules
 │   │   ├── browse.js           # Browse view: categories, search, tags, cards
 │   │   ├── data.js             # Shared: fetchBookmarks, IndexedDB, favorites, theme, layout
+│   │   ├── databases.js        # Database selector: cards UI, switch DB, metadata display
 │   │   ├── info.js             # Info view: stats, charts, domain grid
 │   │   ├── keyboard.js         # Keyboard shortcuts (?, j/k, /, etc.)
 │   │   ├── main.js             # Entry: hash router, init, DB selector
@@ -191,7 +192,7 @@ src/
 - `gen_embedded_front_end_dir.h` — Declarations for above
 
 **Frontend source (front_end/):**
-- `index.html` + `javascript/*.js` + `stylesheet/*.css` + `favicon.ico` + `sw.js`
+- `index.html` + `javascript/*.js` (10 modules: browse, data, databases, info, keyboard, main, panel, random, search, sidebar, tag_bar) + `stylesheet/*.css` + `favicon.ico` + `sw.js`
 - `embed_frontend.bash` — `xxd -i` + gzip per file → C arrays + vfs_entry table
 
 ---
@@ -330,14 +331,25 @@ struct Transport { int fd; };  // opaque to callers
 
 All return `application/json; charset=utf-8` with `Cache-Control: no-cache`.
 
-### 4.15 `mime.c` — MIME Lookup
+### 4.15 `databases.js` — Database Selector UI
+
+- `initDatabaseSelector()` — caches DOM refs (`#db-select-list`, `#db-select-error`)
+- `renderDatabaseSelector()` — fetches `/api/databases`, renders cards via `buildDbCard()`
+- `buildDbCard(db, idx, isActive)` — creates clickable card with:
+  - Icon + file_name + relative time (e.g. "2 hour ago")
+  - Permissions string + `user:group` + absolute timestamp
+  - "Current" badge for active database
+- `selectDatabase(idx, isActive)` — saves to localStorage, reloads page on switch
+- Format helpers: `relativeTime()`, `absoluteTime()`, `permString(mode)`
+
+### 4.16 `mime.c` — MIME Lookup
 
 - Static `struct { const char* ext; const char* mime; } table[]`.
 - Case-insensitive `strcasecmp()` on extension (after last `.`).
 - Fallback: `application/octet-stream`.
 - Covers: HTML, CSS, JS, JSON, images, fonts, audio, video, text, PDF, archives, WASM.
 
-### 4.16 `log.c` — Lock-Free Ring Logger
+### 4.17 `log.c` — Lock-Free Ring Logger
 
 - **Levels**: `LOG_LEVEL_ERROR` (0), `WARN` (1), `INFO` (2), `DEBUG` (3).
 - **Ring**: 4096 `LogSlot { char buf[256]; int len; atomic_int ready; }`.
@@ -574,13 +586,15 @@ sudo make install PREFIX=~/.local  # ~/.local/bin
 - `#browse` — Category sidebar + bookmark grid/list
 - `#info` — Database stats (counts, categories, tags, domains)
 - `#random` — Random link picker with filters
+- `#databases` — Database selector page (cards with metadata, switch workspace)
 
 **Key JS modules:**
-- `data.js` — IndexedDB cache, `fetchBookmarks()`, `fetchDatabases()`, `switchDatabase()`, favorites/theme/layout persistence
+- `data.js` — IndexedDB cache (per-database keys `bookmarks:<idx>`), `fetchBookmarks(idx?)`, `fetchDatabases()`, `getActiveDbIndex()`, `setActiveDbIndex()`, favorites/theme/layout persistence
+- `databases.js` — Database selector UI: renders cards with file_name, mtime, permissions, owner/group; click to switch (reloads page)
 - `browse.js` — Category rendering, search, tag filtering, bookmark cards
 - `info.js` — Statistics computation, charts, domain grid
 - `random.js` — Random selection with category/tag filters
-- `main.js` — Hash router, init, database selector dropdown
+- `main.js` — Hash router, init, database selector integration, header DB indicator (`db-indicator`)
 
 **Service Worker** (`sw.js`): Offline support for embedded assets.
 

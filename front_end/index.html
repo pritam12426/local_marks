@@ -18,6 +18,10 @@
 					<img src="favicon.ico" alt="" width="50">
 				</a>
 				<h1 id="header-title">LocalMarks</h1>
+				<a href="#databases" class="db-indicator" id="db-indicator" title="Switch database">
+					<span class="db-indicator-icon">🛢️</span>
+					<span class="db-indicator-name" id="db-indicator-name">bookmarks.json</span>
+				</a>
 			</div>
 
 			<div class="header-right">
@@ -25,9 +29,6 @@
 					<button class="layout-btn active" data-layout="single" aria-label="Single column">☰</button>
 					<button class="layout-btn" data-layout="grid" aria-label="Two-column grid">▦</button>
 					<button class="layout-btn" data-layout="compact" aria-label="Compact list">≡</button>
-				</div>
-				<div class="db-selector" id="db-selector" title="Switch database">
-					<select id="db-select" aria-label="Select database"></select>
 				</div>
 				<button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light theme">🌙</button>
 				<a href="#info" class="info-btn" aria-label="Database info">📊 Info</a>
@@ -125,6 +126,18 @@
 				<button id="random-open-all" class="random-open-btn" hidden>Open all</button>
 			</div>
 			<div class="bookmark-list" id="random-results"></div>
+		</div>
+	</section>
+
+	<!-- ── DATABASE SELECTOR VIEW ── -->
+	<section id="view-databases" class="view">
+		<div class="db-select-body">
+			<div class="db-select-hero">
+				<img src="favicon.ico" alt="" class="db-select-hero-img">
+				<h2 class="db-select-hero-title">Select a bookmark<br>database</h2>
+			</div>
+			<p class="db-select-error" id="db-select-error" hidden></p>
+			<div class="db-select-list" id="db-select-list"></div>
 		</div>
 	</section>
 

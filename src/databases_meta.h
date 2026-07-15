@@ -11,21 +11,22 @@
 
 // Database metadata structure
 typedef struct {
-	mode_t      mode;
-	char        absolute_path[PATH_MAX];
-	char        file_name[256];
-	size_t      file_size;  // bytes on disk
+	mode_t          mode;
+	char            absolute_path[PATH_MAX];
+	char            file_name[256];
+	size_t          file_size;  // bytes on disk
+
 	// Optional: filesystem extras
-	time_t      cTime;  // inode change time (metadata changes)
-	time_t      bTime;  // birth/creation time (where supported)
-	char        user[256];   // file owner name
-	char        group[256];  // file group name
-	struct timespec mTime;  // modification time
+	time_t          cTime;       // inode change time (metadata changes)
+	time_t          bTime;       // birth/creation time (where supported)
+	char            user[256];   // file owner name
+	char            group[256];  // file group name
+	struct timespec mTime;       // modification time
 } JSON_DB_meta_data;
 
 // Global array for database metadata (stack-allocated, max 10)
 extern JSON_DB_meta_data g_db_meta[MAX_BOOKMARK_FILES];
-extern int g_db_meta_count;
+extern int               g_db_meta_count;
 
 // Populate metadata for all configured bookmark files
 void populate_db_meta_all(const ServerConfig *cfg);

@@ -4,10 +4,10 @@
 
 'use strict';
 
-// ── IndexedDB cache ────────────────────────
+// ── IndexedDB cache (per-database) ─────────
 
 const DB_NAME    = 'LocalMarksCache';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'bookmarks';
 
 function openDB()
@@ -24,17 +24,17 @@ function openDB()
 	});
 }
 
-async function getCached()
+async function getCached(idx)
 {
 	try {
 		const db                = await openDB();
 		const            tx     = db.transaction(STORE_NAME, 'readonly');
 		const            store  = tx.objectStore(STORE_NAME);
 		const            result = await new Promise((res, rej) => {
-			const r     = store.get('bookmarks');
-			r.onsuccess = () => res(r.result || null);
-			r.onerror = () => rej(null);
-		});
+            const r     = store.get(`bookmarks:${idx}`);
+            r.onsuccess = () => res(r.result || null);
+            r.onerror = () => rej(null);
+        });
 		db.close();
 		return result ? result.data : null;
 	} catch {
@@ -42,74 +42,61 @@ async function getCached()
 	}
 }
 
-async function setCache(data)
+async function setCache(idx, data)
 {
 	try {
-		const            db    = await openDB();
+		const db               = await openDB();
 		const            tx    = db.transaction(STORE_NAME, 'readwrite');
 		const            store = tx.objectStore(STORE_NAME);
-		store.put({id: 'bookmarks', data, timestamp: Date.now()});
+		store.put({id: `bookmarks:${idx}`, data, timestamp: Date.now()});
 		db.close();
 	} catch { /* cache is optional */
 	}
 }
 
-export async function fetchBookmarks()
+// ── Active database (localStorage) ─────────
+
+const ACTIVE_DB_KEY = 'localmarks-active-db';
+
+export function getActiveDbIndex()
 {
-	try {
-		const res = await fetch('bookmarks.json', {cache: 'no-cache'});
-		if (!res.ok)
-			throw new Error(`HTTP ${res.status}`);
-		const data = await res.json();
-		setCache(data);
-		return data;
-	} catch (err) {
-		const cached = await getCached();
-		if (cached) {
-			console.warn('⚠️ Network fetch failed, using cached bookmarks:', err.message);
-			return cached;
-		}
-		throw err;
-	}
+	const v = localStorage.getItem(ACTIVE_DB_KEY);
+	return v ? parseInt(v, 10) : 0;
 }
 
-// ── Multi-database support ───────────────────
+export function setActiveDbIndex(idx)
+{
+	localStorage.setItem(ACTIVE_DB_KEY, String(idx));
+}
+
+// ── Database list & bookmark fetching ──────
 
 export async function fetchDatabases()
 {
-	try {
-		const res = await fetch('/api/databases', {cache: 'no-cache'});
-		if (!res.ok)
-			throw new Error(`HTTP ${res.status}`);
-		return await res.json();
-	} catch (err) {
-		console.error('❌ Failed to fetch database list:', err);
-		return {databases: [], count: 0};
-	}
+	const res = await fetch('/api/databases', {cache: 'no-cache'});
+	if (!res.ok)
+		throw new Error(`HTTP ${res.status}`);
+	return res.json();
 }
 
-export async function fetchBookmarksByIndex(index)
+export async function fetchBookmarks(idx = getActiveDbIndex())
 {
+	const url = idx > 0 ? `/bookmarks/${idx}.json` : 'bookmarks.json';
 	try {
-		const res = await fetch(`/bookmarks/${index}.json`, {cache: 'no-cache'});
+		const res = await fetch(url, {cache: 'no-cache'});
 		if (!res.ok)
 			throw new Error(`HTTP ${res.status}`);
 		const data = await res.json();
-		setCache(data);
+		setCache(idx, data);
 		return data;
 	} catch (err) {
-		const cached = await getCached();
+		const cached = await getCached(idx);
 		if (cached) {
 			console.warn('⚠️ Network fetch failed, using cached bookmarks:', err.message);
 			return cached;
 		}
 		throw err;
 	}
-}
-
-export async function switchDatabase(index)
-{
-	return fetchBookmarksByIndex(index);
 }
 
 // ── HTML escape ────────────────────────────
