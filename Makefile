@@ -91,6 +91,7 @@ LDLIBS +=  -lpthread
 HEADERS   = $(wildcard src/*.h)
 SRC      := $(wildcard src/*.c)
 OUT = $(SRC:%.c=$(BUILD)/%.o)
+DEP = $(OUT:.o=.d)
 
 
 all: $(BIN)
@@ -111,9 +112,16 @@ help:  ## Show this help
 $(BUILD):  ## Create build directories automatically
 	mkdir -p $(BUILD)
 
-$(BUILD)/%.o: %.c $(FRONT_END_GENERATED_H)
+$(BUILD)/%.o: %.c | $(FRONT_END_GENERATED_H)
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+# Pull in the compiler-generated per-file header dependencies (created above
+# via -MMD -MP). This is what makes "only the .c file(s) that actually
+# #include gen_embedded_front_end_dir.h get rebuilt when it changes" true —
+# without it, the order-only prerequisite above would correctly avoid a full
+# rebuild, but the one real consumer wouldn't rebuild either.
+-include $(DEP)
 
 # Regenerate when any frontend file or the script itself changes
 $(FRONT_END_GENERATED_C): $(FRONT_END_FILES) $(FRONT_END_SCRIPT)
@@ -144,7 +152,7 @@ install: all  ## Install the local-mark binary
 	$(INSTALL) -m 0755 local-mark.1 $(DESTDIR)$(MANPREFIX)/man1/$(BIN).1
 
 clean:  ## Clean up build artifacts
-	$(RM) -rf $(OUT) $(BIN) $(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_H)
+	$(RM) -rf $(OUT) $(DEP) $(BIN) $(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_H)
 
 uninstall:  ## Uninstall the local-mark binary
 	$(RM) $(DESTDIR)$(PREFIX)/bin/$(BIN)

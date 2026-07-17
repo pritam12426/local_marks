@@ -113,7 +113,6 @@ export function updateCategories(newData)
 	activeCategory = 0;
 	searchQuery = '';
 	elClear.classList.remove('visible');
-	elSearch.value = '';
 
 	updateHeaderCount();
 	renderSidebarFn();
@@ -122,11 +121,18 @@ export function updateCategories(newData)
 
 export function renderBrowse()
 {
-	const q = elSearch.value.trim();
+	const hash = location.hash;
+	const qIdx = hash.indexOf('?');
+	const qs = qIdx === -1 ? '' : hash.slice(qIdx + 1);
+	const qParams = new URLSearchParams(qs);
+	const urlQuery = qParams.get('q') || '';
+
+	const q = urlQuery || elSearch.value.trim();
 	if (q) {
 		searchQuery = q;
 		elClear.classList.add('visible');
 		elCatList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+		if (elSearch.value !== q) elSearch.value = q;
 		renderSearch(q);
 	} else if (searchQuery) {
 		renderSearch(searchQuery);

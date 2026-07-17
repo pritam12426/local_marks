@@ -40,7 +40,7 @@ def save_icon_cache(cache: dict[str, str]) -> None:
 	try:
 		ICON_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
 		ICON_CACHE_FILE.write_text(
-			json.dumps(cache, indent="\t", ensure_ascii=False) + "\n",
+			json.dumps(cache, indent=2, ensure_ascii=False) + "\n",
 			encoding="utf-8",
 		)
 	except Exception as exc:
@@ -336,7 +336,7 @@ def cmd_create(args: argparse.Namespace) -> None:
 		"book_mark_tag_hash": tag_counter,
 	}
 
-	output.write_text(json.dumps(final_data, indent="\t", ensure_ascii=False) + "\n", encoding="utf-8")
+	output.write_text(json.dumps(final_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 	if args.icon:
 		save_icon_cache(icon_cache)
 	print_summary(book_marks, domain_counter, tag_counter, output, icon_stats)
@@ -451,7 +451,7 @@ def cmd_update(args: argparse.Namespace) -> None:
 	}
 
 	output.write_text(
-		json.dumps(final_data, indent="\t", ensure_ascii=False) + "\n",
+		json.dumps(final_data, indent=2, ensure_ascii=False) + "\n",
 		encoding="utf-8",
 	)
 

@@ -42,8 +42,6 @@ export function initDatabaseSelector()
 			elSearch.focus();
 		});
 	}
-
-	initDbKeyboardNavigation();
 }
 
 export async function renderDatabaseSelector()
@@ -127,10 +125,6 @@ function renderCards(databases)
 
 	elList.innerHTML = '';
 	elList.appendChild(frag);
-
-	// Update dbCards reference for keyboard navigation
-	dbCards = Array.from(elList.querySelectorAll('.db-card'));
-	dbFocusedIndex = -1;
 }
 
 // ── Helpers ──────────────────────────────────
@@ -220,105 +214,6 @@ function permString(mode)
 		(m & 0o004) ? 'r' : '-', (m & 0o002) ? 'w' : '-', (m & 0o001) ? 'x' : '-'
 	];
 	return '-' + bits.join('');
-}
-
-let dbFocusedIndex = -1;
-let dbCards = [];
-
-function focusDbCard()
-{
-	if (!dbCards.length) return;
-	if (dbFocusedIndex >= 0 && dbFocusedIndex < dbCards.length) {
-		dbCards[dbFocusedIndex].focus({preventScroll: true});
-		dbCards[dbFocusedIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'});
-	}
-}
-
-function blurCards()
-{
-	dbFocusedIndex = -1;
-	dbCards.forEach(card => {
-		card.classList.remove('focused');
-		card.removeAttribute('aria-selected');
-		card.tabIndex = -1;
-	});
-}
-
-function focusFirstDbCard()
-{
-	dbFocusedIndex = 0;
-	focusDbCard();
-}
-
-// ── Vim-style keyboard navigation for database selector ─────
-function initDbKeyboardNavigation()
-{
-	if (!elList) return;
-
-	// Make cards focusable and add keyboard handlers
-	elList.addEventListener('keydown', handleDbListKeys);
-
-	// Also handle keys on the search input when focused
-	if (elSearch) {
-		elSearch.addEventListener('keydown', e => {
-			if (e.key === 'ArrowDown' || e.key === 'j') {
-				e.preventDefault();
-				focusFirstDbCard();
-			}
-			if (e.key === 'Escape') {
-				elSearch.value = '';
-				filterDatabases('');
-				elClearBtn.hidden = true;
-			}
-		});
-	}
-}
-
-function handleDbListKeys(e)
-{
-	const cards = Array.from(elList.querySelectorAll('.db-card'));
-	if (!cards.length) return;
-
-	switch (e.key) {
-	case 'j':
-	case 'ArrowDown':
-		e.preventDefault();
-		e.stopPropagation();
-		if (dbFocusedIndex < cards.length - 1) {
-			dbFocusedIndex++;
-			focusDbCard();
-		}
-		break;
-	case 'k':
-	case 'ArrowUp':
-		e.preventDefault();
-		e.stopPropagation();
-		if (dbFocusedIndex > 0) {
-			dbFocusedIndex--;
-			focusDbCard();
-		} else if (dbFocusedIndex === 0) {
-			dbFocusedIndex = -1;
-			blurCards();
-			if (elSearch) elSearch.focus();
-		}
-		break;
-	case 'Enter':
-		if (dbFocusedIndex >= 0) {
-			e.preventDefault();
-			e.stopPropagation();
-			cards[dbFocusedIndex].click();
-		}
-		break;
-	case 'Escape':
-		blurCards();
-		if (elSearch) {
-			elSearch.value = '';
-			filterDatabases('');
-			elClearBtn.hidden = true;
-			elSearch.focus();
-		}
-		break;
-	}
 }
 
 function selectDatabase(idx, isActive)

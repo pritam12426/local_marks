@@ -105,7 +105,7 @@ int file_serve(const HttpRequest *req,
 
 	/* Conditional GET: If-None-Match */
 	if (req->if_none_match[0] && strcmp(req->if_none_match, etag) == 0) {
-		LOG_INFO("VFS:%s:%d \"%s\" 304 (ETag match)", client_ip, client_port, req->path);
+		LOG_INFO("%s:%d \"VFS:%s\" 304 (ETag match)", client_ip, client_port, req->path);
 		char extra[256];
 		snprintf(extra, sizeof extra, "ETag: %s\r\n", etag);
 		response_send(t, 304, "Not Modified", NULL, extra, NULL, 0, keep_alive, 1);

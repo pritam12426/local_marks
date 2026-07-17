@@ -5,6 +5,7 @@
 #ifndef _ERROR_H_
 #define _ERROR_H_
 
+
 #include <stddef.h>
 
 typedef struct Transport Transport;
@@ -24,5 +25,6 @@ void error_free_json(char *json);
 // Check error categories
 int error_is_client_error(int status);
 int error_is_server_error(int status);
+
 
 #endif  // _ERROR_H_

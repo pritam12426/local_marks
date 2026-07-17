@@ -1274,6 +1274,12 @@ body.route-databases {
 	outline-offset: 2px;
 }
 
+.db-card.focused {
+	background:   var(--accent-dim);
+	border-color: var(--accent);
+	box-shadow:   0 0 0 2px var(--accent-glow);
+}
+
 .db-card.active {
 	border-color: var(--accent);
 	background:   var(--accent-glow);
