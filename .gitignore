@@ -81,6 +81,9 @@ dkms.conf
 /build
 /src/gen_embedded_front_end_dir.h
 /local-mark
-/third_party
 *.json
 *.log
+
+/third_party/*
+!/third_party/.gitkeep
+!/third_party/Makefile

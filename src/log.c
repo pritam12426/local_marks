@@ -99,8 +99,8 @@ static void log_time_stamp_handler(FILE *out, bool use_color)
 	struct tm tm_now;
 	localtime_r(&ts.tv_sec, &tm_now);
 
-	char timestamp[20];
-	strftime(timestamp, sizeof(timestamp), "%H:%M:%S", &tm_now);
+	char timestamp[28];
+	strftime(timestamp, sizeof(timestamp), "%d-%b-%Y %H:%M:%S", &tm_now);
 
 	int us = (int) (ts.tv_nsec / 1000);  // convert ns → microseconds
 

@@ -24,21 +24,27 @@ static char doc[]                    = MAIN_BINARY " - " PROJECT_DESC;
 // Each option group has a section number for grouping in --help output
 static struct argp_option options[] = {
 	{ 0, 0, 0, 0, "Logging:", 1 },
-	{ "log-level",      'L', "LEVEL",  0,  "Set log level: [error|warn|info|debug] (default: info)",  1 },
-	{ "log-file",       'F', "FILE",   0,  "Set logging file",                                        1 },
-	{ "print-request",  'R', 0,        0,  "Log each client request and its headers",                 1 },
+	{ "log-level",     'L', "LEVEL", 0, "Set log level: [error|warn|info|debug] (default: info)",  1 },
+	{ "log-file",      'F', "FILE",  0, "Set logging file",                                        1 },
+	{ "print-request", 'R', 0,       0, "Log each client request and its headers",                 1 },
 
 	{ 0, 0, 0, 0, "Authentication:", 2 },
-	{ "user",         'u',  "USER",     0,  "Enable Basic-Auth with this username",  2 },
-	{ "pass",         'p',  "PASS",     0,  "Enable Basic-Auth with this password",  2 },
+	{ "user", 'u', "USER", 0, "Enable Basic-Auth with this username",  2 },
+	{ "pass", 'p', "PASS", 0, "Enable Basic-Auth with this password",  2 },
 
 	{ 0, 0, 0, 0, "Connection:", 3 },
-	{ "port",       'P', "PORT",  0,  "TCP port to listen on (default: 8080)",                      3 },
-	{ "host",       'H', "HOST",  0,  "Listener host / IP (default: localhost)",                    3 },
-	{ "threads",    'T', "NUM",   0,  "Thread pool size (default: 2)",                              3 },
-	{ "keep-alive", 'K', "SECS",  0,  "Keep-alive timeout in seconds (default: 3, 0 = disable)",   3 },
-	{ "max-conns",  'M', "NUM",   0,  "Max concurrent connections per IP (default: 0 = unlimited)", 3 },
-	{ "browser", 'B', "BROWSER", 0,  "Open page in BROWSER on startup (e.g. firefox)",              3 },
+	{ "port",        'P', "PORT",    0,  "TCP port to listen on (default: 8080)",                      3 },
+	{ "host",        'H', "HOST",    0,  "Listener host / IP (default: localhost)",                    3 },
+	{ "threads",    'T', "NUM",     0,  "Thread pool size (default: 2)",                              3 },
+	{ "keep-alive", 'K', "SECS",    0,  "Keep-alive timeout in seconds (default: 3, 0 = disable)",    3 },
+	{ "max-conns",  'M', "NUM",     0,  "Max concurrent connections per IP (default: 0 = unlimited)", 3 },
+	{ "browser",    'B', "BROWSER", 0,  "Open page in BROWSER on startup (e.g. firefox)",             3 },
+
+#ifdef SUPPORT_TLS_E
+	{ 0, 0, 0, 0, "HTTPS:", 4 },
+	{ "tls-cert", 'c', "PATH", 0,  "Path to the TLS certificate chain file", 4 },
+	{ "tls-key",  'k', "PATH", 0,  "Path to the TLS key file",               4 },
+#endif  // SUPPORT_TLS_E
 
 	{ 0 }
 };
@@ -62,6 +68,12 @@ typedef struct {
 
 	const char   *bookmark_files[MAX_BOOKMARK_FILES];  // positional: JSON DB file(s)
 	int           bookmark_file_count;                 // number of bookmark files provided
+
+#ifdef SUPPORT_TLS_E
+	const char *tls_cert;
+	const char *tls_key;
+#endif  // SUPPORT_TLS_E
+
 } Arguments;
 
 static Arguments G_Args = {
@@ -80,6 +92,12 @@ static Arguments G_Args = {
 	.log_level       = LOG_LEVEL_INFO,
 
 	.bookmark_file_count = 0,
+
+#ifdef SUPPORT_TLS_E
+	.tls_cert = NULL,
+	.tls_key  = NULL,
+#endif  // SUPPORT_TLS_E
+
 };
 
 /* ── Option parser ────────────────────────────────────────────────────────── */
@@ -107,11 +125,16 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		else     argp_error(state, "Invalid log level: '%s'. Use: error, warn, info, debug.", arg);
 		G_Args.log_level = log_get_level();
 		break;
-	case 'H': G_Args.host      = arg;  break;
-	case 'F': G_Args.log_file  = arg;  break;
-	case 'p': G_Args.pass      = arg;  break;
-	case 'u': G_Args.user      = arg;  break;
-	case 'B': G_Args.browser   = arg; break;
+	case 'H': G_Args.host          = arg;  break;
+	case 'F': G_Args.log_file      = arg;  break;
+	case 'p': G_Args.pass          = arg;  break;
+	case 'u': G_Args.user          = arg;  break;
+	case 'B': G_Args.browser       = arg;  break;
+	case 'R': G_Args.print_request = true; break;
+#ifdef SUPPORT_TLS_E
+	case 'k': G_Args.tls_key  = arg; break;
+	case 'c': G_Args.tls_cert = arg; break;
+#endif  // SUPPORT_TLS_E
 	case 'T': {
 		char *end;
 		long  val = strtol(arg, &end, 10);
@@ -142,18 +165,22 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		G_Args.max_conns = (int)val;
 		break;
 	}
-	case 'R':
-		G_Args.print_request = true;
-		break;
-
-	case ARGP_KEY_ARG:
+	case ARGP_KEY_ARG: {
+		//
+#ifdef SUPPORT_TLS_E
+		if ((G_Args.tls_cert != NULL) && (G_Args.tls_key == NULL)) {
+			argp_error(state, "<BOTH YOU HAVE TO PASS --tls-cert && --tls-key>");
+		} else if  ((G_Args.tls_cert == NULL) && (G_Args.tls_key != NULL)) {
+			argp_error(state, "<BOTH YOU HAVE PASS --tls-cert && --tls-key>");
+		}
+#endif  // SUPPORT_TLS_E
 		// Collect positional bookmark file paths
 		if (G_Args.bookmark_file_count >= MAX_BOOKMARK_FILES)
 			argp_error(state, "Too many bookmark files (max %d).", MAX_BOOKMARK_FILES);
 		G_Args.bookmark_files[G_Args.bookmark_file_count++] = arg;
 		break;
-
-	case ARGP_KEY_END:
+	}
+	case ARGP_KEY_END: {
 		// Validate argument combinations after all flags are parsed
 		if (G_Args.bookmark_file_count == 0)
 			argp_error(state, "At least one bookmark JSON file is required.");
@@ -167,6 +194,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 				argp_error(state, "Cannot read bookmark file: '%s'.", G_Args.bookmark_files[i]);
 		}
 		break;
+	}
 
 	default: return ARGP_ERR_UNKNOWN;
 	}
