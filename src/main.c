@@ -192,6 +192,14 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 			if (access(G_Args.bookmark_files[i], R_OK) != 0)
 				argp_error(state, "Cannot read bookmark file: '%s'.", G_Args.bookmark_files[i]);
 		}
+
+#ifdef SUPPORT_TLS_E
+		// Verify TLS certificate and key files exist and are readable
+		if (G_Args.tls_cert && access(G_Args.tls_cert, R_OK) != 0)
+			argp_error(state, "Cannot read TLS certificate: '%s'.", G_Args.tls_cert);
+		if (G_Args.tls_key && access(G_Args.tls_key, R_OK) != 0)
+			argp_error(state, "Cannot read TLS private key: '%s'.", G_Args.tls_key);
+#endif  // SUPPORT_TLS_E
 		break;
 	}
 
@@ -244,6 +252,10 @@ ServerConfig cfg = {
 		.thread_pool_size  = G_Args.threads,
 		.keep_alive_timeout = G_Args.keep_alive,
 		.max_conns_per_ip  = G_Args.max_conns,
+#ifdef SUPPORT_TLS_E
+		.tls_cert          = G_Args.tls_cert,
+		.tls_key           = G_Args.tls_key,
+#endif  // SUPPORT_TLS_E
 	};
 
 	for (int i = 0; i < G_Args.bookmark_file_count; i++) {

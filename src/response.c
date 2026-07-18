@@ -22,6 +22,7 @@
 #include "project_config.h"
 #include "transport.h"
 #include "header_cache.h"
+#include "error.h"
 
 // Send a complete HTTP response with headers and optional body
 void response_send(Transport  *t,
@@ -71,8 +72,9 @@ void response_send(Transport  *t,
 
 // Send an error page with a styled HTML body (status + detail message)
 // The inline CSS supports light/dark mode via prefers-color-scheme
-void response_error(Transport *t, int status, const char *status_text, const char *detail)
+void response_error(Transport *t, int status, const char *detail)
 {
+	const char *status_text = error_find_status_text(status);
 	char body[4096];
 	int  blen = snprintf(
 	    body,
@@ -163,7 +165,7 @@ void response_error(Transport *t, int status, const char *status_text, const cha
 	    status_text,
 	    detail ? detail : "An unexpected error occurred.");
 
-	if ((size_t)blen > sizeof(body)) blen = (int)sizeof(body) - 1;
+	if (blen < 0 || (size_t)blen >= sizeof(body)) blen = (int)sizeof(body) - 1;
 	LOG_DEBUG("Sending error response: %d %s — %s", status, status_text, detail ? detail : "");
 	response_send(t, status, status_text, "text/html; charset=utf-8", NULL, body, (size_t) blen, 0, 1);
 }

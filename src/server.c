@@ -27,6 +27,10 @@
 #include "thread_pool.h"
 #include "transport.h"
 
+#ifdef SUPPORT_TLS_E
+#include "tlse.h"
+#endif  // SUPPORT_TLS_E
+
 static atomic_int g_shutdown = 0;
 
 static void handle_signal(int sig)
@@ -92,13 +96,15 @@ static void handle_client(void *arg)
 			}
 		}
 
+		// Compute keep-alive for this request
+		keep_alive = wants_keep_alive(&req, cfg.keep_alive_timeout);
+
 		// Handle API endpoints first
 		if (api_handle_request(&req, t, client_ip, client_port,
 		                       &cfg, keep_alive, cfg.print_request)) {
 			// API handled the request
 		} else {
 			// Fall through to file serving
-			keep_alive = wants_keep_alive(&req, cfg.keep_alive_timeout);
 			file_serve(&req, t, client_ip, client_port,
 			           cfg.print_request, keep_alive);
 		}
@@ -193,15 +199,12 @@ static void open_browser(const char *browser, const char *host, int port, bool t
 
 	pid_t pid = fork();
 	if (pid == 0) {
+		// Child: avoid LOG_* (inherits parent's locked mutexes → deadlock)
 		execlp(browser, browser, url, (char *)NULL);
 #if defined(__linux__)
-		LOG_WARN("Browser '%s' not found, trying xdg-open fallback", browser);
 		execlp("xdg-open", "xdg-open", url, (char *)NULL);
-		LOG_ERROR("xdg-open also failed to launch");
 #elif defined(__APPLE__)
-		LOG_WARN("Browser '%s' not found, trying open fallback", browser);
 		execlp("open", "open", url, (char *)NULL);
-		LOG_ERROR("open also failed to launch");
 #endif
 		_exit(1);
 	}
@@ -210,6 +213,30 @@ static void open_browser(const char *browser, const char *host, int port, bool t
 		LOG_PERROR("fork for browser open");
 	}
 }
+
+#ifdef SUPPORT_TLS_E
+// Read a file into a malloc'd buffer. Caller must free().
+static char *read_file_to_buffer(const char *path, size_t *out_len)
+{
+	FILE *f = fopen(path, "rb");
+	if (!f) return NULL;
+
+	fseek(f, 0, SEEK_END);
+	long len = ftell(f);
+	if (len < 0) { fclose(f); return NULL; }
+	rewind(f);
+
+	char *buf = malloc((size_t)len + 1);
+	if (!buf) { fclose(f); return NULL; }
+
+	size_t nread = fread(buf, 1, (size_t)len, f);
+	fclose(f);
+
+	buf[nread] = '\0';
+	*out_len = nread;
+	return buf;
+}
+#endif  // SUPPORT_TLS_E
 
 int server_run(const ServerConfig *cfg)
 {
@@ -249,7 +276,59 @@ int server_run(const ServerConfig *cfg)
 		}
 	}
 
-	LOG_INFO("Serving on http://%s:%d", cfg->host, cfg->port);
+#ifdef SUPPORT_TLS_E
+	// TLS master context — created once, used to produce per-connection child contexts
+	struct TLSContext *tls_master = NULL;
+	if (cfg->tls_cert && cfg->tls_key) {
+		tls_init();
+		tls_master = tls_create_context(1, TLS_V12);
+		if (!tls_master) {
+			LOG_ERROR("Failed to create TLS context");
+			goto fail_cleanup;
+		}
+
+		// Load certificate chain
+		size_t cert_len = 0;
+		char *cert_pem = read_file_to_buffer(cfg->tls_cert, &cert_len);
+		if (!cert_pem) {
+			LOG_ERROR("Failed to read TLS certificate: %s", cfg->tls_cert);
+			tls_destroy_context(tls_master);
+			goto fail_cleanup;
+		}
+		if (tls_load_certificates(tls_master, (unsigned char *)cert_pem, (int)cert_len) != 1) {
+			LOG_ERROR("Failed to load TLS certificate from: %s", cfg->tls_cert);
+			free(cert_pem);
+			tls_destroy_context(tls_master);
+			goto fail_cleanup;
+		}
+		free(cert_pem);
+
+		// Load private key
+		size_t key_len = 0;
+		char *key_pem = read_file_to_buffer(cfg->tls_key, &key_len);
+		if (!key_pem) {
+			LOG_ERROR("Failed to read TLS private key: %s", cfg->tls_key);
+			tls_destroy_context(tls_master);
+			goto fail_cleanup;
+		}
+		if (tls_load_private_key(tls_master, (unsigned char *)key_pem, (int)key_len) != 1) {
+			LOG_ERROR("Failed to load TLS private key from: %s", cfg->tls_key);
+			free(key_pem);
+			tls_destroy_context(tls_master);
+			goto fail_cleanup;
+		}
+		free(key_pem);
+
+		LOG_INFO("TLS enabled (cert: %s)", cfg->tls_cert);
+	}
+#endif  // SUPPORT_TLS_E
+
+	bool tls_enabled = false;
+#ifdef SUPPORT_TLS_E
+	tls_enabled = (tls_master != NULL);
+#endif  // SUPPORT_TLS_E
+
+	LOG_INFO("Serving on http%s://%s:%d", tls_enabled ? "s" : "", cfg->host, cfg->port);
 	LOG_INFO("Thread pool: %d workers", cfg->thread_pool_size);
 	if (cfg->keep_alive_timeout > 0)
 		LOG_INFO("Keep-alive: %ds timeout", cfg->keep_alive_timeout);
@@ -257,7 +336,7 @@ int server_run(const ServerConfig *cfg)
 		LOG_INFO("Rate limit: %d conns/IP", cfg->max_conns_per_ip);
 
 	if (cfg->browser)
-		open_browser(cfg->browser, cfg->host, cfg->port, false);
+		open_browser(cfg->browser, cfg->host, cfg->port, tls_enabled);
 
 	while (!atomic_load_explicit(&g_shutdown, memory_order_relaxed)) {
 		struct sockaddr_storage client_addr;
@@ -282,6 +361,12 @@ int server_run(const ServerConfig *cfg)
 			close(cfd);
 			continue;
 		}
+
+#ifdef SUPPORT_TLS_E
+		// Attach TLS context if configured — transport_accept() will do the handshake
+		if (tls_master)
+			transport_set_tls(t, tls_master);
+#endif  // SUPPORT_TLS_E
 
 		if (transport_accept(t) != 0) {
 			LOG_WARN("transport_accept failed for fd=%d", cfd);
@@ -318,10 +403,14 @@ int server_run(const ServerConfig *cfg)
 	LOG_INFO("Shutting down....");
 
 	close(lfd);
-
 	thread_pool_destroy(pool);
 
 	if (rl) ratelimit_destroy(rl);
+
+#ifdef SUPPORT_TLS_E
+	if (tls_master)
+		tls_destroy_context(tls_master);
+#endif  // SUPPORT_TLS_E
 
 	// Cleanup
 	bookmark_cache_cleanup();
@@ -329,4 +418,20 @@ int server_run(const ServerConfig *cfg)
 
 	LOG_INFO("Goodbye.");
 	return 0;
+
+#ifdef SUPPORT_TLS_E
+fail_cleanup:
+	close(lfd);
+	thread_pool_destroy(pool);
+
+	if (rl) ratelimit_destroy(rl);
+
+	if (tls_master)
+		tls_destroy_context(tls_master);
+
+	bookmark_cache_cleanup();
+	db_meta_cleanup();
+
+	return -1;
+#endif  // SUPPORT_TLS_E
 }

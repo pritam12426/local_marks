@@ -15,6 +15,7 @@
 
 #include <pthread.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -50,22 +51,30 @@ void header_cache_init(void)
 	LOG_INFO("Header cache initialized (Server: %s)", MAIN_BINARY "/" PROJECT_VERSION);
 }
 
-// Get cached Date header (updates once per second)
-const char *header_cache_date(void)
+// Copy cached Date header into caller's buffer (thread-safe)
+int header_cache_date_copy(char *buf, size_t buf_len)
 {
 	static time_t last_update = 0;
 	time_t now = time(NULL);
 
 	if (now != last_update) {
 		pthread_mutex_lock(&hc_mutex);
-		if (now != last_update) {  // double-check
+		if (now != last_update) {
 			header_cache_update_date();
 			last_update = now;
-			LOG_DEBUG("Date header regenerated");
 		}
 		pthread_mutex_unlock(&hc_mutex);
 	}
-	return hc_date;
+	// Copy under lock to avoid reading while another thread writes
+	pthread_mutex_lock(&hc_mutex);
+	size_t len = strlen(hc_date);
+	if (len >= buf_len) {
+		pthread_mutex_unlock(&hc_mutex);
+		return -1;
+	}
+	memcpy(buf, hc_date, len + 1);
+	pthread_mutex_unlock(&hc_mutex);
+	return 0;
 }
 
 const char *header_cache_server(void)
@@ -86,7 +95,9 @@ int header_cache_build(char *buf, size_t buf_len,
                        const char *extra_headers,
                        int keep_alive)
 {
-	const char *date = header_cache_date();
+	char date_buf[64];
+	if (header_cache_date_copy(date_buf, sizeof date_buf) != 0)
+		date_buf[0] = '\0';
 	const char *server = header_cache_server();
 	const char *conn = header_cache_conn(keep_alive);
 
@@ -100,7 +111,7 @@ int header_cache_build(char *buf, size_t buf_len,
 	                   "%s"
 	                   "\r\n",
 	                   status, status_text,
-	                   date,
+	                   date_buf,
 	                   server,
 	                   content_type ? content_type : "",
 	                   content_length,
@@ -118,7 +129,9 @@ int header_cache_build_no_type(char *buf, size_t buf_len,
                                const char *extra_headers,
                                int keep_alive)
 {
-	const char *date = header_cache_date();
+	char date_buf[64];
+	if (header_cache_date_copy(date_buf, sizeof date_buf) != 0)
+		date_buf[0] = '\0';
 	const char *server = header_cache_server();
 	const char *conn = header_cache_conn(keep_alive);
 
@@ -131,7 +144,7 @@ int header_cache_build_no_type(char *buf, size_t buf_len,
 	                   "%s"
 	                   "\r\n",
 	                   status, status_text,
-	                   date,
+	                   date_buf,
 	                   server,
 	                   content_length,
 	                   extra_headers ? extra_headers : "",

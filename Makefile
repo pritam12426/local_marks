@@ -186,9 +186,6 @@ download-tls:  ## Download the tlse sources into third_party/ without building
 download-tls: $(TLS_DIR)/libtomcrypt.c $(TLS_DIR)/tlse.c $(TLS_DIR)/tlse.h
 	@echo "TLS files downloaded to $(TLS_DIR)/"
 
-clean-tls:  ## Remove downloaded TLS sources and their build objects
-	$(RM) -rf $(TLS_DIR) $(BUILD)/$(TLS_DIR)
-
 # ── Build targets ────────────────────────────────────────────────────────────
 
 $(BIN): $(OUT) $(FRONT_END_GENERATED_O) ## Build the local-mark binary
@@ -197,7 +194,7 @@ $(BIN): $(OUT) $(FRONT_END_GENERATED_O) ## Build the local-mark binary
 debug:  ## Build the debug binary — run `make debug`
 	$(MAKE) $(BIN) O_DEBUG=1
 
-tls:  ## Build with TLS support (downloads tlse into third_party/ on first run) — run `make tls`
+tls:  ## Build with TLS support (downloads tlse into third_party / on first run) — run `make tls`
 	$(MAKE) $(BIN) O_TLS=1
 
 install: all  ## Install the local-mark binary
@@ -209,7 +206,11 @@ install: all  ## Install the local-mark binary
 	$(INSTALL) -m 0755 local-mark.1 $(DESTDIR)$(MANPREFIX)/man1/$(BIN).1
 
 clean:  ## Clean up build artifacts
-	$(RM) -rf $(OUT) $(DEP) $(BIN) $(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_H) $(BUILD)/$(TLS_DIR)
+	# $(RM) -rf $(BUILD)/src/* $(DEP) $(BIN) $(FRONT_END_GENERATED_C)
+	$(RM) -rf $(BUILD)/src/* $(BIN) $(FRONT_END_GENERATED_C)
+
+clean-tls:  ## Remove downloaded TLS sources and their build objects
+	$(RM) -rf $(TLS_DIR) $(BUILD)/$(TLS_DIR)
 
 uninstall:  ## Uninstall the local-mark binary
 	$(RM) $(DESTDIR)$(PREFIX)/bin/$(BIN)

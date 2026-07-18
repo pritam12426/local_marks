@@ -37,8 +37,11 @@ int header_cache_build_no_type(char       *buf,
                                const char *extra_headers,
                                int         keep_alive);
 
+// Copy cached Date header into caller's buffer (thread-safe)
+// Returns 0 on success, -1 on buffer too small
+int header_cache_date_copy(char *buf, size_t buf_len);
+
 // Accessor functions for individual cached components
-const char *header_cache_date(void);
 const char *header_cache_server(void);
 const char *header_cache_conn(int keep_alive);
 

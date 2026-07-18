@@ -11,18 +11,21 @@ local-mark \- Local-first bookmark browser with embedded SPA and multi-database 
 .B local-mark
 is a local-first bookmark browser. It reads one or more JSON bookmark databases
 (created with \fBmarks2json\fR(1)) and serves an embedded single-page application
-(SPA) over HTTP. The frontend provides browsing, search, tag filtering, random
-link picking, database statistics, and a multi-database selector.
+(SPA) over HTTP (or HTTPS with TLS). The frontend provides browsing, search, tag
+filtering, random link picking, database statistics, and a multi-database selector.
 
 All static assets (HTML, JavaScript, CSS, favicon, service worker) are
 gzip-compressed and embedded directly into the binary at compile time. No
 filesystem access is required at runtime for frontend assets.
+
+When built with TLS support (\fBmake tls\fR), \fBlocal-mark\fR can serve over
+HTTPS using a PEM certificate and key, with no reverse proxy required.
 .SH OPTIONS
 .TP
 \fB-h\fR, \fB--help\fR
 Display help and exit.
 .TP
-\fB-V\fR, \fB--version\fRk
+\fB-V\fR, \fB--version\fR
 Print version and exit.
 .TP
 \fB--usage\fR
@@ -65,6 +68,15 @@ Keep-alive timeout in seconds (default: \fB3\fR, \fB0\fR = disable).
 \fB-M\fR, \fB--max-conns\fR=\fINUM\fR
 Max concurrent connections per IP (default: \fB0\fR = unlimited, range: \fB0-1000\fR).
 .PP
+HTTPS (requires build with \fBmake tls\fR):
+.TP
+\fB-c\fR, \fB--tls-cert\fR=\fIPATH\fR
+Path to TLS certificate chain PEM file. Both \fB--tls-cert\fR and \fB--tls-key\fR
+must be provided together; omitting either starts the server in plaintext mode.
+.TP
+\fB-k\fR, \fB--tls-key\fR=\fIPATH\fR
+Path to TLS private key PEM file.
+.PP
 Browser:
 .TP
 \fB-B\fR, \fB--browser\fR=\fIBROWSER\fR
@@ -100,6 +112,25 @@ The JSON database files must follow the schema produced by \fBmarks2json\fR(1):
 .fi
 .PP
 Categories are derived from filenames by \fBmarks2json\fR(1).
+.SH TLS SETUP
+When built with \fBmake tls\fR, \fBlocal-mark\fR supports native HTTPS.
+.PP
+Using \fBmkcert\fR (recommended, trusted by your browser):
+.PP
+.nf
+  mkcert -install            # one-time: install local CA
+  mkcert localhost           # generates localhost.pem + localhost-key.pem
+  local-mark --tls-cert localhost.pem --tls-key localhost-key.pem bookmarks.json
+.fi
+.PP
+Using OpenSSL (shows browser warning):
+.PP
+.nf
+  openssl req -x509 -newkey rsa:2048 -nodes \\
+    -keyout key.pem -out cert.pem -days 365 \\
+    -subj '/CN=localhost'
+  local-mark -c cert.pem -k key.pem bookmarks.json
+.fi
 .SH API ENDPOINTS
 .TP
 \fBGET /bookmarks.json\fR

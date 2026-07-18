@@ -26,7 +26,7 @@ static void fill_timespec(struct timespec *out, const struct stat *st)
 	out->tv_nsec = st->st_mtim.tv_nsec;
 #elif defined(__APPLE__)
 	out->tv_nsec = st->st_mtimespec.tv_nsec;
-#else // __linux__
+#else  // __linux__
 	out->tv_nsec = 0;
 #endif
 }
@@ -108,20 +108,28 @@ void populate_db_meta_all(const ServerConfig *cfg)
 // Caller must free the returned string
 char *build_databases_json(void)
 {
-	size_t buf_size = 1024 + (size_t)g_db_meta_count * 256;
+	// Each entry: absolute_path (PATH_MAX) + file_name (256) + user (256)
+	// + group (256) + JSON keys/numbers (~200) + overhead
+	size_t buf_size = 1024 + (size_t)g_db_meta_count * (PATH_MAX + 1024);
 	char *buf = malloc(buf_size);
 	if (!buf) return NULL;
 
 	size_t offset = 0;
-	offset += (size_t)snprintf(buf + offset, buf_size - offset,
-	                   "{\"databases\":[");
+	int n;
+
+	n = snprintf(buf + offset, buf_size - offset, "{\"databases\":[");
+	if (n < 0) { free(buf); return NULL; }
+	offset += (size_t)n;
+
 	for (int i = 0; i < g_db_meta_count; i++) {
 		const JSON_DB_meta_data *meta = &g_db_meta[i];
 
 		if (i > 0) {
-			offset += (size_t)snprintf(buf + offset, buf_size - offset, ",");
+			n = snprintf(buf + offset, buf_size - offset, ",");
+			if (n < 0 || offset + (size_t)n >= buf_size) { free(buf); return NULL; }
+			offset += (size_t)n;
 		}
-		offset += (size_t)snprintf(buf + offset, buf_size - offset,
+		n = snprintf(buf + offset, buf_size - offset,
 		                   "{\"mode\":\"%04o\","
 		                   "\"absolute_path\":\"%s\","
 		                   "\"file_name\":\"%s\","
@@ -142,9 +150,13 @@ char *build_databases_json(void)
 		                   meta->group,
 		                   (long)meta->mTime.tv_sec,
 		                   (long)meta->mTime.tv_nsec);
+		if (n < 0 || offset + (size_t)n >= buf_size) { free(buf); return NULL; }
+		offset += (size_t)n;
 	}
-	offset += (size_t)snprintf(buf + offset, buf_size - offset,
-	                   "],\"count\":%d}", g_db_meta_count);
+
+	n = snprintf(buf + offset, buf_size - offset, "],\"count\":%d}", g_db_meta_count);
+	if (n < 0 || offset + (size_t)n >= buf_size) { free(buf); return NULL; }
+	offset += (size_t)n;
 
 	return buf;
 }

@@ -6,15 +6,15 @@
 
 ## 1. Project Identity
 
-| Attribute        | Value                                                                                                                                                                         |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Name**         | local-mark                                                                                                                                                                    |
-| **Language**     | C17 (strict: `-std=c17 -Wall -Wextra -Wpedantic -Wstrict-prototypes -Wmissing-prototypes -Wshadow -Wconversion`)                                                              |
-| **Platforms**    | Linux, macOS (also compiles on other POSIX)                                                                                                                                   |
-| **Dependencies** | Zero runtime deps. Build-time: `argp-standalone` on macOS (Homebrew), `pthread`, C library                                                                                    |
-| **Binary**       | Single executable `./local-mark` (~400 KB stripped)                                                                                                                           |
-| **License**      | MIT                                                                                                                                                                           |
-| **Philosophy**   | _Local-first bookmark browser._ Single binary serving embedded SPA + multi-database JSON API. No config files, no env vars, no TLS, no external DB. All config via CLI flags. |
+| Attribute        | Value                                                                                                                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**         | local-mark                                                                                                                                                                                         |
+| **Language**     | C17 (strict: `-std=c17 -Wall -Wextra -Wpedantic -Wstrict-prototypes -Wmissing-prototypes -Wshadow -Wconversion`)                                                                                   |
+| **Platforms**    | Linux, macOS (also compiles on other POSIX)                                                                                                                                                        |
+| **Dependencies** | Zero runtime deps. Build-time: `argp-standalone` on macOS (Homebrew), `pthread`, C library. Optional: `tlse` (TLS, via `make tls`)                                                                 |
+| **Binary**       | Single executable `./local-mark` (~400 KB stripped)                                                                                                                                                |
+| **License**      | MIT                                                                                                                                                                                                |
+| **Philosophy**   | _Local-first bookmark browser._ Single binary serving embedded SPA + multi-database JSON API. No config files, no env vars, no external DB. All config via CLI flags. Optional TLS via `make tls`. |
 
 **Not a framework.** Not a library. A self-contained tool for browsing bookmark databases locally.
 
@@ -29,12 +29,15 @@
 │       ↓                 ↓                  ↓                                  │
 │  bookmark_cache_init → thread_pool_create                                     │
 │       ↓                                                                       │
+│  [if --tls-cert/--tls-key] tls_init → tls_create_context → tls_load_*        │
+│       ↓                                                                       │
 │  ratelimit_create (if --max-conns) → make_listener                            │
 │       ↓                                                                       │
 │  accept() loop ────────────────────────────────────────────────────────────┐  │
 │       │                                                                    │  │
-│                                                                           │  │
-│  transport_new() + ratelimit_accept() + thread_pool_submit()               │  │
+│       │                                                                    │  │
+│  transport_new() + [if TLS] transport_set_tls()                            │  │
+│  + ratelimit_accept() + thread_pool_submit()                               │  │
 └─────────┼──────────────────────────────────────────────────────────────────┼──┘
           │                                                                  │
                                                                             
@@ -75,6 +78,9 @@
 │                                        │  + Range +      │                     │
 │                                        │  Content-       │                     │
 │                                        │  Encoding)      │                     │
+│                                        │                 │                     │
+│                                        │ [if TLS] transport_write() chunks     │
+│                                        │ plaintext 16KB, flushes per chunk     │
 │                                        └─────────────────┘                     │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -94,69 +100,65 @@
 
 ```
 local_marks/
-├── .clang-tidy                 # clang-tidy config (analyzer, readability, modernize, bugprone, etc.)
-├── .editorconfig               # EditorConfig for consistent formatting
-├── .gitattributes              # Git attributes
-├── .gitignore                  # Git ignore rules
-├── AGENTS.md                   # Agent instructions for this project
-├── LICENSE                     # MIT License
-├── Makefile                    # Build system (release, debug, install, clean, strip)
-├── PROJECT_BRIEF.md            # This document
-├── README.md                   # Project overview
-├── REFERENCES.md               # External references & links
-├── TODO.txt                    # Task list
-├── marks2json.py               # Python tool: create/update/find-dead bookmark DBs
-├── local-mark                  # Built binary (after `make`)
+├── .clang-tidy                       # clang-tidy config (analyzer, readability, modernize, bugprone, etc.)
+├── .editorconfig                     # EditorConfig for consistent formatting
+├── .gitattributes                    # Git attributes
+├── .gitignore                        # Git ignore rules
+├── AGENTS.md                         # Agent instructions for this project
+├── LICENSE                           # MIT License
+├── Makefile                          # Build system (release, debug, install, clean, strip)
+├── PROJECT_BRIEF.md                  # This document
+├── README.md                         # Project overview
+├── REFERENCES.md                     # External references & links
+├── TODO.txt                          # Task list
+├── marks2json.py                     # Python tool: create/update/find-dead bookmark DBs
+├── local-mark                        # Built binary (after `make`)
 │
-├── front_end/                  # ── Embedded SPA Source ────────────────────────
-│   ├── embed_frontend.bash     # Build script: gzip + xxd -i per file → C arrays
-│   ├── favicon.ico             # Favicon
-│   ├── index.html              # SPA entry point (hash routing)
+├── front_end/                        # ── Embedded SPA Source ────────────────────────
+│   ├── embed_frontend.bash           # Build script: gzip + xxd -i per file → C arrays
+│   ├── favicon.ico                   # Favicon
+│   ├── index.html                    # SPA entry point (hash routing)
 │   │
-│   ├── javascript/             # ES Modules
-│   │   ├── browse.js           # Browse view: categories, search, tags, cards
-│   │   ├── data.js             # Shared: fetchBookmarks, IndexedDB, favorites, theme, layout
-│   │   ├── databases.js        # Database selector: cards UI, switch DB, metadata display
-│   │   ├── info.js             # Info view: stats, charts, domain grid
-│   │   ├── keyboard.js         # Keyboard shortcuts (?, j/k, /, etc.)
-│   │   ├── main.js             # Entry: hash router, init, DB selector
-│   │   ├── panel.js            # Bookmark panel rendering
-│   │   ├── random.js           # Random view: picker with filters
-│   │   ├── search.js           # Search logic (title, desc, tags, URL)
-│   │   ├── sidebar.js          # Category sidebar rendering & events
-│   │   └── tag_bar.js          # Tag filter pills UI
+│   ├── javascript/                   # ES Modules
+│   │   ├── browse.js                 # Browse view: categories, search, tags, cards
+│   │   ├── data.js                   # Shared: fetchBookmarks, IndexedDB, favorites, theme, layout
+│   │   ├── databases.js              # Database selector: cards UI, switch DB, metadata display
+│   │   ├── info.js                   # Info view: stats, charts, domain grid
+│   │   ├── keyboard.js               # Keyboard shortcuts (?, j/k, /, etc.)
+│   │   ├── main.js                   # Entry: hash router, init, DB selector
+│   │   ├── panel.js                  # Bookmark panel rendering
+│   │   ├── random.js                 # Random view: picker with filters
+│   │   ├── search.js                 # Search logic (title, desc, tags, URL)
+│   │   ├── sidebar.js                # Category sidebar rendering & events
+│   │   └── tag_bar.js                # Tag filter pills UI
 │   │
-│   └── stylesheet/             # CSS
-│       ├── style.css           # Main styles (dark/light via CSS vars)
+│   └── stylesheet/                   # CSS
+│       ├── style.css                 # Main styles (dark/light via CSS vars)
 │       └── themes/
-│           └── light.css       # Light theme overrides
+│           └── light.css             # Light theme overrides
 │
-├── src/                        # ── C Source (flat, .c/.h pairs) ──────────────
-│   ├── api.c / .h              # API endpoints (/bookmarks*, /api/databases*)
-│   ├── auth.c / .h             # HTTP Basic Auth
-│   ├── bookmark_cache.c / .h   # Multi-DB JSON cache (mtime invalidation)
-│   ├── common.h                # MAX_BOOKMARK_FILES = 10
-│   ├── databases_meta.c / .h   # File metadata (stat, user/group, realpath)
-│   ├── file.c / .h             # VFS file serving (embedded frontend)
+├── src/                              # ── C Source (flat, .c/.h pairs) ──────────────
+│   ├── api.c / .h                    # API endpoints (/bookmarks*, /api/databases*)
+│   ├── auth.c / .h                   # HTTP Basic Auth
+│   ├── bookmark_cache.c / .h         # Multi-DB JSON cache (mtime invalidation)
+│   ├── common.h                      # MAX_BOOKMARK_FILES = 10
+│   ├── databases_meta.c / .h         # File metadata (stat, user/group, realpath)
+│   ├── file.c / .h                   # VFS file serving (embedded frontend)
 │   ├── gen_embedded_front_end_dir.h  # Auto-generated: vfs_entry[] + extern arrays
-│   ├── header_cache.c / .h     # Pre-computed Date/Server/Connection headers
-│   ├── http.c / .h             # HTTP request parser (buffered, in-place)
-│   ├── log.c / .h              # Lock-free SPSC ring logger
-│   ├── main.c                  # Entry: argp CLI, validation, startup
-│   ├── mime.c / .h             # Extension → MIME lookup
-│   ├── project_config.h        # VERSION, BINARY_NAME, HOMEPAGE_URL
-│   ├── ratelimit.c / .h        # Per-IP connection limit (1024-slot hash)
-│   ├── response.c / .h         # Response builders (error, redirect, send)
-│   ├── server.c / .h           # Accept loop, thread pool dispatch, keep-alive
-│   ├── thread_pool.c / .h      # Fixed-size pool (circular queue, mutex+condvars)
-│   ├── transport.c / .h        # Opaque Transport (fd wrapper, writev, timeouts)
-│   └── vfs_hash.c / .h         # O(1) VFS hash table (FNV-1a, linear probe)
+│   ├── header_cache.c / .h           # Pre-computed Date/Server/Connection headers
+│   ├── http.c / .h                   # HTTP request parser (buffered, in-place)
+│   ├── log.c / .h                    # Lock-free SPSC ring logger
+│   ├── main.c                        # Entry: argp CLI, validation, startup
+│   ├── mime.c / .h                   # Extension → MIME lookup
+│   ├── project_config.h              # VERSION, BINARY_NAME, HOMEPAGE_URL
+│   ├── ratelimit.c / .h              # Per-IP connection limit (1024-slot hash)
+│   ├── response.c / .h               # Response builders (error, redirect, send)
+│   ├── server.c / .h                 # Accept loop, thread pool dispatch, keep-alive
+│   ├── thread_pool.c / .h            # Fixed-size pool (circular queue, mutex+condvars)
+│   ├── transport.c / .h              # Opaque Transport (fd wrapper, writev, TLS, timeouts)
+│   └── vfs_hash.c / .h               # O(1) VFS hash table (FNV-1a, linear probe)
 │
-└── third_party/                # ── Vendored deps (build-time only) ───────────
-    └── eduardsui_tlse-v1.0.7/  # TLS lib (not used in current build)
-    ├── libtomcrypt.c
-    ├── tlse.c
-    └── tlse.h
+└── third_party
 ```
 
 ---
@@ -165,25 +167,25 @@ local_marks/
 
 ```
 src/
-├── main.c                      # Entry point, argp parsing, ServerConfig construction
-├── server.c / .h               # Accept loop, signal handling, thread pool dispatch, keep-alive
-├── transport.c / .h            # Opaque Transport (fd wrapper), read/write/writev, timeouts
-├── http.c / .h                 # Request parser (4 KB buffered reads, HttpRequest struct)
-├── response.c / .h             # High-level response builders (error, redirect, send)
-├── header_cache.c / .h         # Pre-computed Date/Server/Connection headers (1 Hz update)
-├── file.c / .h                 # VFS-based file serving (embedded frontend only)
-├── vfs_hash.c / .h             # O(1) hash table for embedded files (FNV-1a, linear probe)
-├── gen_embedded_front_end_dir.h# Auto-generated: vfs_entry[] + extern C arrays
-├── auth.c / .h                 # Basic Auth (Base64 decode, credential check)
-├── thread_pool.c / .h          # Fixed-size pool, circular queue, mutex + 2 condvars
-├── ratelimit.c / .h            # Per-IP connection limit (fixed 1024-slot hash table)
-├── mime.c / .h                 # Extension → MIME lookup (static table, strcasecmp)
-├── log.c / .h                  # Lock-free SPSC ring (4096 slots), consumer thread
-├── api.c / .h                  # API endpoints (/bookmarks.json, /bookmarks/<idx>.json, /api/databases)
-├── bookmark_cache.c / .h       # Per-database JSON cache with mtime invalidation
-├── databases_meta.c / .h       # File metadata (stat, user/group names, absolute paths)
-├── common.h                    # Shared constants (MAX_BOOKMARK_FILES = 10)
-├── project_config.h            # VERSION, BINARY_NAME, HOMEPAGE_URL constants
+├── main.c                        # Entry point, argp parsing, ServerConfig construction
+├── server.c / .h                 # Accept loop, signal handling, thread pool dispatch, keep-alive, TLS context
+├── transport.c / .h              # Opaque Transport (fd wrapper, writev, TLS handshake/encrypt, timeouts)
+├── http.c / .h                   # Request parser (4 KB buffered reads, HttpRequest struct)
+├── response.c / .h               # High-level response builders (error, redirect, send)
+├── header_cache.c / .h           # Pre-computed Date/Server/Connection headers (1 Hz update)
+├── file.c / .h                   # VFS-based file serving (embedded frontend only)
+├── vfs_hash.c / .h               # O(1) hash table for embedded files (FNV-1a, linear probe)
+├── gen_embedded_front_end_dir.h  # Auto-generated: vfs_entry[] + extern C arrays
+├── auth.c / .h                   # Basic Auth (Base64 decode, credential check)
+├── thread_pool.c / .h            # Fixed-size pool, circular queue, mutex + 2 condvars
+├── ratelimit.c / .h              # Per-IP connection limit (fixed 1024-slot hash table)
+├── mime.c / .h                   # Extension → MIME lookup (static table, strcasecmp)
+├── log.c / .h                    # Lock-free SPSC ring (4096 slots), consumer thread
+├── api.c / .h                    # API endpoints (/bookmarks.json, /bookmarks/<idx>.json, /api/databases)
+├── bookmark_cache.c / .h         # Per-database JSON cache with mtime invalidation
+├── databases_meta.c / .h         # File metadata (stat, user/group names, absolute paths)
+├── common.h                      # Shared constants (MAX_BOOKMARK_FILES = 10)
+├── project_config.h              # VERSION, BINARY_NAME, HOMEPAGE_URL constants
 ```
 
 **Auto-generated (build/):**
@@ -205,6 +207,7 @@ src/
 - `argp_parse()` with `parse_opt()` callback → fills global `Arguments G_Args`.
 - Positional args: `<DB_FILE(s)>...` (max 10, from `common.h`).
 - Validates all bookmark files exist and are readable at parse time.
+- TLS flags (`--tls-cert`, `--tls-key`): validates file exists and is readable at parse time (if TLS compiled in).
 - Clamps: threads 1–256, port 1–65535, keep-alive 0–3600, max-conns 0–1000.
 - Calls `log_init(NULL)` → starts consumer thread.
 - Initializes VFS hash table: `vfs_hash_init()`.
@@ -216,8 +219,9 @@ src/
 ### 4.2 `server.c` — Server Core
 
 - **Signals**: SIGINT/SIGTERM → `g_shutdown=1`; SIGPIPE → `SIG_IGN`.
+- **TLS context** (optional): reads PEM cert+key into memory via `read_file_to_buffer()`, creates `tls_load_certificates()` + `tls_load_private_key()` on master context.
 - **Listener**: `getaddrinfo()` → socket → `SO_REUSEADDR|SO_REUSEPORT` → `listen(128)`.
-- **Accept loop**: blocking `accept()`, wraps fd in `Transport`, `transport_accept()`, `peer_addr()` for IP, `ratelimit_accept()`, `thread_pool_submit(ClientJob)`.
+- **Accept loop**: blocking `accept()`, wraps fd in `Transport`, `transport_accept()` (performs TLS handshake if configured), `peer_addr()` for IP, `ratelimit_accept()`, `thread_pool_submit(ClientJob)`.
 - **ClientJob**: owns `Transport*`, client IP/port, copied `ServerConfig`, `RateLimit*`.
 - **Request handling** (`handle_client`):
   1. `http_parse_request()` → HttpRequest
@@ -225,18 +229,25 @@ src/
   3. **API first**: `api_handle_request()` handles `/bookmarks.json`, `/bookmarks/<idx>.json`, `/api/databases*`
   4. **Else VFS file serving**: `file_serve()` → embedded frontend files
   5. Keep-alive loop via `wants_keep_alive()` + `transport_set_timeout()`
-- **Shutdown**: closes listener → `thread_pool_destroy()` → `ratelimit_destroy()` → `bookmark_cache_cleanup()` → `db_meta_cleanup()`.
+- **Shutdown**: closes listener → `thread_pool_destroy()` → `ratelimit_destroy()` → `bookmark_cache_cleanup()` → `db_meta_cleanup()`. TLS: destroys master TLS context.
 
 ### 4.3 `transport.c` — Socket Abstraction
 
 ```c
-struct Transport { int fd; };  // opaque to callers
+struct Transport {
+    int fd;
+#ifdef SUPPORT_TLS_E
+    struct TLSContext *tls_ctx;  // NULL when plaintext
+#endif
+};
 ```
 
-- `transport_write()`: handles partial writes, retries on `EINTR`.
-- `transport_writev()`: `writev()` for header+body in one syscall.
+- `transport_write()`: handles partial writes, retries on `EINTR`. TLS mode: chunks plaintext into ≤16KB, calls `tls_write` per chunk, then `tls_get_write_buffer` + `send()` for ciphertext.
+- `transport_writev()`: `writev()` for header+body in one syscall. TLS mode: writes each iov entry separately (concatenating into one buffer hits `tls_write` size limits).
 - `transport_set_timeout()`: `SO_RCVTIMEO` for keep-alive.
-- `transport_destroy()`: nullifies caller's pointer after `free()`.
+- `transport_destroy()`: nullifies caller's pointer after `free()`. TLS mode: calls `tls_close_notify()` + `tls_destroy_context()`.
+- `transport_accept()`: if TLS configured, performs TLS handshake via `tls_accept()`. Returns -1 on failure (logs error, closes fd).
+- `transport_is_tls()`: returns `tls_ctx != NULL`.
 - `TCP_NODELAY` set in `transport_new()`.
 
 ### 4.4 `http.c` — Request Parser
@@ -368,26 +379,28 @@ Format helpers: `relativeTime()`, `absoluteTime()`, `permString(mode)`
 ```
 1. main thread: accept() → cfd
 2. transport_new(cfd) → Transport* (TCP_NODELAY set)
-3. peer_addr() → client_ip:port
-4. ratelimit_accept(ip) → OK
-5. ClientJob* malloc'd, filled
-6. thread_pool_submit(handle_client, job)
+3. [if TLS] transport_set_tls(transport, tls_ctx) → TLS handshake via tls_accept()
+4. peer_addr() → client_ip:port
+5. ratelimit_accept(ip) → OK
+6. ClientJob* malloc'd, filled
+7. thread_pool_submit(handle_client, job)
 
 Worker thread:
-7. http_parse_request() → HttpRequest (4 KB buffered read)
-8. If auth configured → auth_check() → 401 or continue
-9. api_handle_request():
+8. http_parse_request() → HttpRequest (4 KB buffered read; decrypted if TLS)
+9. If auth configured → auth_check() → 401 or continue
+10. api_handle_request():
    a. If /bookmarks.json or /bookmarks/<idx>.json → serve cached bookmark JSON
    b. If /api/databases* → serve metadata JSON
    c. Returns 1 if handled, 0 otherwise
-10. If not API → file_serve():
+11. If not API → file_serve():
     a. Method check (GET/HEAD)
     b. vfs_lookup(path) → vfs_entry*
     c. Conditional GET? → 304
     d. Range? → validate, serve partial
     e. response_send() → header_cache_build() + transport_writev()
-11. keep_alive? → transport_set_timeout() → loop to step 7
-12. cleanup: ratelimit_leave(), transport_destroy(), free(job)
+       [if TLS] transport_write() chunks plaintext 16KB per tls_write call
+12. keep_alive? → transport_set_timeout() → loop to step 8
+13. cleanup: ratelimit_leave(), transport_destroy(), free(job)
 ```
 
 ---
@@ -408,6 +421,9 @@ LDFLAGS += -largp
 # Linux
 CFLAGS += -D_GNU_SOURCE
 
+# TLS (optional, via `make tls`):
+# Downloads tlse into third_party, adds -DSUPPORT_TLS_E, links tlse.c
+
 # Debug target:
 make debug O_DEBUG=1
 # → -g3 -DDEBUG -fstack-usage -fsanitize=address -fsanitize=undefined -ffreestanding
@@ -415,6 +431,7 @@ make debug O_DEBUG=1
 # Release:
 make            # -O3
 make strip      # -O3 + strip symbols
+make tls        # -O3 + TLS support (tlse linked in)
 sudo make install            # /usr/local/bin
 sudo make install PREFIX=~/.local  # ~/.local/bin
 ```
@@ -465,6 +482,7 @@ xxd -n SYMBOL -i gzip_stage/xxx.gz
 | No compression at runtime       | Files pre-gzipped at embed time; `Content-Encoding: gzip` header added         |
 | No TLS                          | Zero-dep promise. Use reverse proxy (Caddy, nginx) for HTTPS                   |
 | Opaque `Transport`              | Future TLS swap without touching callers                                       |
+| Optional TLS via `make tls`     | `tlse` single-file lib, zero runtime deps without TLS. Chunks 16KB plaintext.  |
 | Lock-free ring logger           | Eliminates mutex contention under load; consumer batches I/O                   |
 | Pre-computed headers            | Date/Server/Connection formatted once/sec, not per-request                     |
 | `writev()` header+body          | Single syscall, fewer TCP segments                                             |
@@ -488,7 +506,7 @@ xxd -n SYMBOL -i gzip_stage/xxx.gz
 
 ## 10. Known Limitations (By Design)
 
-- **No HTTPS** — pair with Caddy/nginx/mkcert.
+- **Optional HTTPS** — TLS available via `make tls` (tlse lib, ~100KB added to binary). Still no runtime deps.
 - **No compression at runtime** — files pre-compressed at build.
 - **No directory listing** — VFS serves only known embedded files.
 - **No HTTP/2** — single-threaded accept + thread pool is HTTP/1.1 only.
@@ -501,10 +519,10 @@ xxd -n SYMBOL -i gzip_stage/xxx.gz
 
 ## 11. Version History (Current: 1.1.0)
 
-| Version | Changes                                                                                                                                                                   |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.1.0   | Multi-database support (/bookmarks/<idx>.json, /api/databases), database selector UI, absolute_path via realpath, user/group names, live_server core optimizations merged |
-| 1.0.0   | Initial: embedded frontend + single bookmark.json + basic HTTP server                                                                                                     |
+| Version | Changes                                                                                                                                                                                |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.0   | Multi-database support, database selector UI, optional TLS via `make tls` (tlse lib), transport_writev TLS-safe iov splitting, user/group names, live_server core optimizations merged |
+| 1.0.0   | Initial: embedded frontend + single bookmark.json + basic HTTP server                                                                                                                  |
 
 ---
 
@@ -536,9 +554,10 @@ xxd -n SYMBOL -i gzip_stage/xxx.gz
 - [ ] All shared state protected by mutexes (ratelimit, header_cache, bookmark_cache, thread pool queue)
 - [ ] Lock-free only in logger (SPSC ring)
 - [ ] `Transport` is the **only** way to touch sockets
-- [ ] `writev()` for all responses
+- [ ] `writev()` for all plaintext responses
+- [ ] TLS (optional): `transport_write()` chunks plaintext 16KB, `transport_writev()` writes each iov separately
 - [ ] No streaming request bodies (GET/HEAD only)
-- [ ] No directory listing, no runtime compression, no TLS, no HTTP/2
+- [ ] No directory listing, no runtime compression, no HTTP/2
 
 ---
 
@@ -547,6 +566,9 @@ xxd -n SYMBOL -i gzip_stage/xxx.gz
 ```bash
 # Build release
 make
+
+# Build with TLS
+make tls
 
 # Build debug (ASan+UBSan)
 make debug O_DEBUG=1
@@ -568,6 +590,9 @@ make clean && make
 
 # With rate limit
 ./local-mark -M 10 bookmarks.json
+
+# With TLS (requires make tls)
+./local-mark --tls-cert cert.pem --tls-key key.pem bookmarks.json
 
 # Install
 sudo make install           # /usr/local/bin
@@ -652,27 +677,27 @@ title | url | description | #tag1 #tag2
 }
 ```
 
-| Field                   | Type         | Description                                 |
-| ----------------------- | ------------ | ------------------------------------------- |
-| `book_Marks`            | `Category[]` | Array of categories (order preserved)       |
-| `Category.category`     | `string`     | Category name (from filename)               |
-| `Category.bookmarks`    | `Bookmark[]` | Bookmarks in this category                  |
-| `Bookmark.title`        | `string`     | Display title (fallback: URL)               |
-| `Bookmark.url`          | `string`     | Absolute URL (must have http/https)         |
-| `Bookmark.description`  | `string`     | Optional description                        |
-| `Bookmark.tags`         | `string[]`   | Tags without `#` prefix in JSON             |
-| `Bookmark.domain`       | `string`     | Extracted hostname (no `www.`)              |
-| `Bookmark.icon`         | `string?`    | YouTube channel avatar URL                  |
+| Field                   | Type         | Description                                  |
+| ----------------------- | ------------ | -------------------------------------------- |
+| `book_Marks`            | `Category[]` | Array of categories (order preserved)        |
+| `Category.category`     | `string`     | Category name (from filename)                |
+| `Category.bookmarks`    | `Bookmark[]` | Bookmarks in this category                   |
+| `Bookmark.title`        | `string`     | Display title (fallback: URL)                |
+| `Bookmark.url`          | `string`     | Absolute URL (must have http/https)          |
+| `Bookmark.description`  | `string`     | Optional description                         |
+| `Bookmark.tags`         | `string[]`   | Tags without `#` prefix in JSON              |
+| `Bookmark.domain`       | `string`     | Extracted hostname (no `www.`)               |
+| `Bookmark.icon`         | `string?`    | YouTube channel avatar URL                   |
 | `book_mark_domain_hash` | `object`     | Domain → count across all bookmarks         |
 | `book_mark_tag_hash`    | `object`     | Tag (with `#`) → count across all bookmarks |
 
 ### 15.5 API Endpoints Consumed by Frontend
 
-| Endpoint                | Method | Response                              | Used By                           |
-| ----------------------- | ------ | ------------------------------------- | --------------------------------- |
+| Endpoint                | Method | Response                              | Used By                            |
+| ----------------------- | ------ | ------------------------------------- | ---------------------------------- |
 | `/api/databases`        | GET    | `{ databases: DBMeta[], count: int }` | `databases.js` → selector page    |
-| `/api/databases/<idx>`  | GET    | `DBMeta`                              | (future: single DB detail)        |
-| `/bookmarks.json`       | GET    | Full JSON of first DB                 | Backward compat                   |
+| `/api/databases/<idx>`  | GET    | `DBMeta`                              | (future: single DB detail)         |
+| `/bookmarks.json`       | GET    | Full JSON of first DB                 | Backward compat                    |
 | `/bookmarks/<idx>.json` | GET    | Full JSON of DB at index              | `data.js` → `fetchBookmarks(idx)` |
 
 **DBMeta fields:**
@@ -694,12 +719,12 @@ title | url | description | #tag1 #tag2
 
 ### 15.6 Persistence (localStorage)
 
-| Key                    | Value                                          |
-| ---------------------- | ---------------------------------------------- |
+| Key                    | Value                                           |
+| ---------------------- | ----------------------------------------------- |
 | `localmarks-favorites` | `string[]` — starred URLs                      |
-| `localmarks-layout`    | `"single" \| "grid" \| "compact"`              |
+| `localmarks-layout`    | `"single" \| "grid" \| "compact"`               |
 | `localmarks-sidebar-w` | `number` — sidebar width in px                 |
-| `localmarks-theme`     | `"dark" \| "light"`                            |
+| `localmarks-theme`     | `"dark" \| "light"`                             |
 | `localmarks-active-db` | `string` — database index (e.g., `"0"`, `"1"`) |
 
 ### 15.7 IndexedDB Cache

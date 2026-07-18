@@ -48,6 +48,11 @@ static int load_bookmark_json(const char *path, bookmark_cache_entry_t *entry)
 		return -1;
 	}
 
+	// Free old cached data before overwriting
+	free(entry->json);
+	entry->json = NULL;
+	entry->json_len = 0;
+
 	entry->json = malloc((size_t)size + 1);
 	if (!entry->json) {
 		LOG_ERROR("Failed to allocate %ld bytes for bookmark JSON", size);
@@ -62,6 +67,7 @@ static int load_bookmark_json(const char *path, bookmark_cache_entry_t *entry)
 		LOG_ERROR("Short read on '%s': expected %ld, got %zu", path, size, read);
 		free(entry->json);
 		entry->json = NULL;
+		entry->json_len = 0;
 		return -1;
 	}
 
@@ -181,9 +187,11 @@ pthread_mutex_unlock(&g_bookmark_cache_mutex);
 
 const char *get_cached_bookmark_json_by_index(int index)
 {
-	if (index < 0 || index >= g_db_cache_count) return NULL;
-
 	pthread_mutex_lock(&g_bookmark_cache_mutex);
+	if (index < 0 || index >= g_db_cache_count) {
+		pthread_mutex_unlock(&g_bookmark_cache_mutex);
+		return NULL;
+	}
 	bookmark_cache_entry_t *entry = &g_db_cache[index];
 
 	if (!entry->json) {
@@ -220,6 +228,54 @@ const char *get_cached_bookmark_json_by_index(int index)
 
 size_t get_cached_bookmark_json_len_by_index(int index)
 {
-	if (index < 0 || index >= g_db_cache_count) return 0;
-	return g_db_cache[index].json_len;
+	pthread_mutex_lock(&g_bookmark_cache_mutex);
+	if (index < 0 || index >= g_db_cache_count) {
+		pthread_mutex_unlock(&g_bookmark_cache_mutex);
+		return 0;
+	}
+	size_t len = g_db_cache[index].json_len;
+	pthread_mutex_unlock(&g_bookmark_cache_mutex);
+	return len;
+}
+
+char *get_cached_bookmark_json_copy(int index, size_t *out_len)
+{
+	pthread_mutex_lock(&g_bookmark_cache_mutex);
+	if (index < 0 || index >= g_db_cache_count) {
+		pthread_mutex_unlock(&g_bookmark_cache_mutex);
+		return NULL;
+	}
+	bookmark_cache_entry_t *entry = &g_db_cache[index];
+
+	// Load if not loaded yet
+	if (!entry->json) {
+		if (load_bookmark_json(entry->path, entry) != 0) {
+			pthread_mutex_unlock(&g_bookmark_cache_mutex);
+			return NULL;
+		}
+		struct stat st;
+		if (stat(entry->path, &st) == 0)
+			entry->mtime = st.st_mtime;
+	} else {
+		// Check mtime for cache invalidation
+		struct stat st;
+		if (stat(entry->path, &st) == 0 && st.st_mtime != entry->mtime) {
+			LOG_INFO("Reloading bookmark DB (mtime changed): %s", entry->path);
+			if (load_bookmark_json(entry->path, entry) == 0)
+				entry->mtime = st.st_mtime;
+			else {
+				pthread_mutex_unlock(&g_bookmark_cache_mutex);
+				return NULL;
+			}
+		}
+	}
+
+	// Return a copy — safe to use after mutex unlock
+	if (out_len) *out_len = entry->json_len;
+	char *copy = malloc(entry->json_len + 1);
+	if (copy) {
+		memcpy(copy, entry->json, entry->json_len + 1);
+	}
+	pthread_mutex_unlock(&g_bookmark_cache_mutex);
+	return copy;
 }

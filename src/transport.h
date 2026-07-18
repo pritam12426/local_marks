@@ -20,6 +20,10 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 
+#ifdef SUPPORT_TLS_E
+struct TLSContext;
+#endif  // SUPPORT_TLS_E
+
 typedef struct Transport Transport;
 
 // Allocate a new transport for a connected socket fd.
@@ -47,6 +51,12 @@ int transport_set_timeout(Transport *t, int seconds);
 // Accessors
 int transport_fd(const Transport *t);
 bool transport_is_tls(const Transport *t);
+
+#ifdef SUPPORT_TLS_E
+// Attach a TLS context to this transport (for accepted connections).
+// The master context is used to produce child contexts via tls_accept().
+void transport_set_tls(Transport *t, struct TLSContext *master_ctx);
+#endif  // SUPPORT_TLS_E
 
 
 #endif  // _TRANSPORT_H_

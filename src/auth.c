@@ -90,9 +90,7 @@ int auth_check(const HttpRequest *req,
 	int user_set = expected_user && *expected_user;
 	int pass_set = expected_pass && *expected_pass;
 
-	LOG_DEBUG("auth_check: expected_user='%s', expected_pass='%s', user_set=%d, pass_set=%d",
-              expected_user ? expected_user : "(null)",
-              expected_pass ? expected_pass : "(null)",
+	LOG_DEBUG("auth_check: user_set=%d, pass_set=%d",
               user_set, pass_set);
 
 	// If neither user nor pass is configured, auth is disabled
@@ -117,7 +115,6 @@ int auth_check(const HttpRequest *req,
 	// Extract and decode the Base64 payload
 	const char *b64 = hdr + 6;
 	while (*b64 == ' ') b64++;
-	LOG_DEBUG("Base64 credentials: %s", b64);
 
 	char decoded[512];
 	int  dec_len = b64_decode(b64, decoded, (int)sizeof decoded);

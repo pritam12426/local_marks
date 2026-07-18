@@ -11,7 +11,6 @@ Turn pipe-delimited bookmark files into a searchable, categorized local web UI. 
 
 <img src="./assets/home_page.png" alt="LocalMarks home page" width="100%">
 
----
 
 ## Table of Contents
 
@@ -20,6 +19,7 @@ Turn pipe-delimited bookmark files into a searchable, categorized local web UI. 
 - [Building from Source](#building-from-source)
 - [Creating Your Bookmark Database](#creating-your-bookmark-database)
 - [Running the Viewer](#running-the-viewer)
+- [Running with TLS](#running-with-tls)
 - [Multi-Database Support](#multi-database-support)
 - [Configuration Options](#configuration-options)
 - [Writing `.txt` Bookmark Files](#writing-txt-bookmark-files)
@@ -30,11 +30,9 @@ Turn pipe-delimited bookmark files into a searchable, categorized local web UI. 
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
----
-
 ## Quick Start
 
-```bash
+```sh
 # 1. Build
 make
 
@@ -49,8 +47,6 @@ make
 #    → Click a database to load it
 ```
 
----
-
 ## Prerequisites
 
 | Platform   | Requirements                                                                  |
@@ -61,16 +57,18 @@ make
 
 > **Note**: The frontend is embedded in the binary via gzip-compressed C arrays. Opening `front_end/index.html` as `file://` will not work — browsers block `fetch()` on local files.
 
----
 
 ## Building from Source
 
-```bash
+```sh
 # Release build (optimized, stripped)
 make
 
 # Debug build (ASan + UBSan + stack usage + debug logs)
 make debug -B O_DEBUG=1
+
+# Build with TLS support (downloads tlse into third_party on first run)
+make tls
 
 # Clean build artifacts
 make clean
@@ -87,17 +85,17 @@ sudo make install
 | ------------------------------------------ | ------------------------------- |
 | `-O3`                                      | Release optimization            |
 | `-g3 -DDEBUG -fsanitize=address,undefined` | Debug build                     |
-| `-DLOG_SHOW_TIME_STAMP`                    | Always on — timestamps in logs  |
-| `-DLOG_SHOW_SOURCE_LOCATION`               | Debug only — file:line in logs  |
+| `-DLOG_SHOW_TIME_STAMP`                    | Always on — timestamps in logs |
+| `-DLOG_SHOW_SOURCE_LOCATION`               | Debug only — file:line in logs |
+| `-DSUPPORT_TLS_E`                          | TLS support (via `make tls`)    |
 | `-largp`                                   | macOS only (argp from Homebrew) |
 
----
 
 ## Creating Your Bookmark Database
 
 ### 1. Write `.txt` files (one per category)
 
-```bash
+```sh
 # Example: free_time.txt
 # ── Games ───────────────────────────────────
 akinator      | https://en.akinator.com          | Guess a celebrity     | #Game
@@ -112,7 +110,7 @@ earthcam      | https://www.earthcam.com         | Live cameras worldwide   | #C
 
 ### 2. Convert to JSON
 
-```bash
+```sh
 # Create new database
 ./marks2json create *.txt -T bookmarks.json
 
@@ -171,45 +169,78 @@ title | url | description | tags
 }
 ```
 
----
-
 ## Running the Viewer
 
 ### Single Database
 
-```bash
+```sh
 ./local-mark bookmarks.json
 # → http://localhost:8080 (lands on Database Selector)
 ```
 
 ### Multiple Databases
 
-```bash
+```sh
 ./local-mark work.json personal.json learning.json
 # Serves all three; switch via Database Selector page
 ```
 
 ### Common Options
 
-| Option         | Short | Default         | Description                                 |
-| -------------- | ----- | --------------- | ------------------------------------------- |
-| `FILE...`      | —     | **required**    | Bookmark JSON file(s) (max 10)              |
-| `--port`       | `-P`  | `8080`          | TCP port                                    |
-| `--host`       | `-H`  | `localhost`     | Bind address (`0.0.0.0` for all interfaces) |
-| `--user`       | `-u`  | —               | Basic auth username                         |
-| `--pass`       | `-p`  | —               | Basic auth password                         |
-| `--max-conns`  | `-M`  | `0` (unlimited) | Max concurrent connections per IP           |
-| `--browser`    | `-B`  | —               | Open browser on startup                     |
-| `--log-level`  | `-L`  | `info`          | `error`, `warn`, `info`, `debug`            |
-| `--log-file`   | `-F`  | stderr          | Append logs to file                         |
-| `--threads`    | `-T`  | `2`             | Worker thread pool size                     |
-| `--keep-alive` | `-K`  | `3`             | Keep-alive timeout (seconds, 0 = disable)   |
+| Option         | Short | Default          | Description                                       |
+| -------------- | ----- | ---------------- | ------------------------------------------------- |
+| `FILE...`      | —    | **required**     | Bookmark JSON file(s) (max 10)                    |
+| `--port`       | `-P`  | `8080`           | TCP port                                          |
+| `--host`       | `-H`  | `localhost`      | Bind address (`0.0.0.0` for all interfaces)       |
+| `--user`       | `-u`  | —               | Basic auth username                               |
+| `--pass`       | `-p`  | —               | Basic auth password                               |
+| `--max-conns`  | `-M`  | `0` (unlimited)  | Max concurrent connections per IP                 |
+| `--browser`    | `-B`  | —               | Open browser on startup                           |
+| `--log-level`  | `-L`  | `info`           | `error`, `warn`, `info`, `debug`                  |
+| `--log-file`   | `-F`  | stderr           | Append logs to file                               |
+| `--threads`    | `-T`  | `2`              | Worker thread pool size                           |
+| `--keep-alive` | `-K`  | `3`              | Keep-alive timeout (seconds, 0 = disable)         |
+| `--tls-cert`   | `-c`  | —               | Path to TLS certificate PEM (requires `make tls`) |
+| `--tls-key`    | `-k`  | —               | Path to TLS private key PEM (requires `make tls`) |
 
-> **Note on `--keep-alive`**: Default is 3s for backward compat, but for a local tool TLS is not used so handshake cost is zero. Recommended: `-K 0` to disable (simpler, no idle connections tying up thread pool). Enable only when behind TLS-terminating reverse proxy.
+> **Note on `--keep-alive`**: Default is 3s for backward compat. Recommended: `-K 0` to disable (simpler, no idle connections tying up thread pool). Only enable when using persistent connections or behind a TLS-terminating reverse proxy.
+
+### Running with TLS
+
+TLS requires a self-signed certificate (see below). Both flags are required; omitting either starts the server in plaintext mode.
+
+```sh
+# Build with TLS
+make tls
+
+# Run with certificate
+./local-mark --tls-cert cert.pem --tls-key key.pem bookmarks.json
+# → https://localhost:8080 (auto-opens browser)
+```
+
+> **Note**: Self-signed certs trigger browser warnings. Use `mkcert` (below) to get a green lock, or add an exception for `https://localhost`.
+
+#### Creating a self-signed certificate
+
+**Option A — mkcert (recommended, trusted by your browser):**
+
+```sh
+brew install mkcert    # or: apt install mkcert
+mkcert -install        # installs local CA (one-time)
+mkcert localhost       # → localhost.pem + localhost-key.pem
+```
+
+**Option B — OpenSSL (self-signed, shows browser warning):**
+
+```sh
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout key.pem -out cert.pem -days 365 \
+  -subj '/CN=localhost'
+```
 
 ### Examples
 
-```bash
+```sh
 # Public access with auth
 ./local-mark -u admin -p secret -H 0.0.0.0 bookmarks.json
 
@@ -240,13 +271,13 @@ When you pass multiple `.json` files:
 
 ### API Endpoints
 
-| Endpoint                      | Description                              |
-| ----------------------------- | ---------------------------------------- |
-| `GET /bookmarks.json`         | First database (backward compat)         |
-| `GET /bookmarks/0.json`       | Database at index 0                      |
-| `GET /bookmarks/1.json`       | Database at index 1                      |
-| `GET /api/databases`          | List all databases with metadata         |
-| `GET /api/databases/0`        | Metadata for database 0                  |
+| Endpoint                | Description                      |
+| ----------------------- | -------------------------------- |
+| `GET /bookmarks.json`   | First database (backward compat) |
+| `GET /bookmarks/0.json` | Database at index 0              |
+| `GET /bookmarks/1.json` | Database at index 1              |
+| `GET /api/databases`    | List all databases with metadata |
+| `GET /api/databases/0`  | Metadata for database 0          |
 
 ### Database Selector Page
 
@@ -294,29 +325,30 @@ When you pass multiple `.json` files:
 ```text
 Usage: local-mark [OPTION...] <DB_FILE(s)>...
 
-Logging:
-  -L, --log-level=LEVEL     Log level: error|warn|info|debug (default: info)
-  -F, --log-file=FILE       Append logs to FILE (default: stderr)
-  -R, --print-request       Log each client request and headers
+ Logging:
+  -F, --log-file=FILE        Set logging file
+  -L, --log-level=LEVEL      Set log level: [error|warn|info|debug] (default: info)
+  -R, --print-request        Log each client request and its headers
 
-Authentication:
-  -u, --user=USER           Enable Basic Auth with username
-  -p, --pass=PASS           Enable Basic Auth with password
+ Authentication:
+  -p, --pass=PASS            Enable Basic-Auth with this password
+  -u, --user=USER            Enable Basic-Auth with this username
 
-Connection:
-  -H, --host=HOST           Listener host/IP (default: localhost)
-  -P, --port=PORT           TCP port (default: 8080)
-  -T, --threads=NUM         Thread pool size (default: 2)
-  -K, --keep-alive=SECS     Keep-alive timeout (default: 3, 0 = disable)
-  -M, --max-conns=NUM       Max concurrent conns per IP (0 = unlimited)
+ Connection:
+  -B, --browser=BROWSER      Open page in BROWSER on startup (e.g. firefox)
+  -H, --host=HOST            Listener host / IP (default: localhost)
+  -K, --keep-alive=SECS      Keep-alive timeout in seconds (default: 3, 0 = disable)
+  -M, --max-conns=NUM        Max concurrent connections per IP (default: 0 = unlimited)
+  -P, --port=PORT            TCP port to listen on (default: 8080)
+  -T, --threads=NUM          Thread pool size (default: 2)
 
-Browser:
-  -B, --browser=BROWSER     Open browser on startup (e.g. firefox, chrome)
+ HTTPS:
+  -c, --tls-cert=PATH        Path to the TLS certificate chain file
+  -k, --tls-key=PATH         Path to the TLS key file
 
-Help:
-  -?, --help                Show this help
-  --usage                   Show brief usage
-  -V, --version             Print program version
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
 ```
 
 ### Environment Variables
@@ -367,7 +399,7 @@ oddee         | https://www.oddee.com/           | Random interesting stuff | #B
 
 ## marks2json — The Converter
 
-```bash
+```sh
 # Create fresh database
 marks2json create *.txt -T bookmarks.json
 
@@ -394,7 +426,17 @@ marks2json create *.txt -T bookmarks.json --icon
 
 ## Features
 
+### Databases Selected View (`#databases`)
+
+---
+
+<img src="./assets/database_selector_page.png" alt="Browse view" width="100%">
+
+- **Manual toggle** (☀️/🌙 in header) → persists to `localStorage` (`localmarks-theme`)
+
 ### Browse View (`#browse`)
+
+---
 
 <img src="./assets/home_page.png" alt="Browse view" width="100%">
 
@@ -410,6 +452,8 @@ marks2json create *.txt -T bookmarks.json --icon
 
 ### Info View (`#info`)
 
+---
+
 <img src="./assets/info_page.png" alt="Info view" width="100%">
 
 - **Stats strip**: Total, unique URLs, categories, domains, tags
@@ -420,6 +464,8 @@ marks2json create *.txt -T bookmarks.json --icon
 
 ### Random View (`#random`)
 
+---
+
 <img src="./assets/random_page.png" alt="Random view" width="100%">
 
 - Pick N random links with optional category/tag filters
@@ -427,6 +473,8 @@ marks2json create *.txt -T bookmarks.json --icon
 - Shows match pool size
 
 ### Theme System
+
+---
 
 - **Dark** (default, `style.css`)
 - **Light** (`stylesheet/themes/light.css`) — auto via `prefers-color-scheme: light`
@@ -476,54 +524,66 @@ marks2json create *.txt -T bookmarks.json --icon
 
 ```
 local_marks/
-├── Makefile                    # Build system
-├── marks2json.py               # .txt → JSON converter
+├── .clang-tidy                       # clang-tidy config (analyzer, readability, modernize, bugprone, etc.)
+├── .editorconfig                     # EditorConfig for consistent formatting
+├── .gitattributes                    # Git attributes
+├── .gitignore                        # Git ignore rules
+├── AGENTS.md                         # Agent instructions for this project
+├── LICENSE                           # MIT License
+├── Makefile                          # Build system (release, debug, install, clean, strip)
+├── PROJECT_BRIEF.md                  # This document
+├── README.md                         # Project overview
+├── REFERENCES.md                     # External references & links
+├── TODO.txt                          # Task list
+├── marks2json.py                     # Python tool: create/update/find-dead bookmark DBs
+├── local-mark                        # Built binary (after `make`)
 │
-├── front_end/                  # ── Embedded SPA ────────────────────
-│   ├── embed_frontend.bash     # Build: gzip + xxd -i per file
-│   ├── favicon.ico
-│   ├── index.html              # SPA shell (hash routing)
+├── front_end/                        # ── Embedded SPA Source ────────────────────────
+│   ├── embed_frontend.bash           # Build script: gzip + xxd -i per file → C arrays
+│   ├── favicon.ico                   # Favicon
+│   ├── index.html                    # SPA entry point (hash routing)
 │   │
-│   ├── javascript/             # ES Modules
-│   │   ├── browse.js           # Browse view
-│   │   ├── data.js             # Shared: fetch, IndexedDB, favorites, theme
-│   │   ├── databases.js        # Database selector page (cards, metadata)
-│   │   ├── info.js             # Info view (stats, charts, health check)
-│   │   ├── keyboard.js         # Vim-style shortcuts
-│   │   ├── main.js             # Entry: router, init, DB indicator
-│   │   ├── panel.js            # Bookmark panel rendering
-│   │   ├── random.js           # Random picker
-│   │   ├── search.js           # Search logic
-│   │   ├── sidebar.js          # Category sidebar
-│   │   └── tag_bar.js          # Tag filter pills
+│   ├── javascript/                   # ES Modules
+│   │   ├── browse.js                 # Browse view: categories, search, tags, cards
+│   │   ├── data.js                   # Shared: fetchBookmarks, IndexedDB, favorites, theme, layout
+│   │   ├── databases.js              # Database selector: cards UI, switch DB, metadata display
+│   │   ├── info.js                   # Info view: stats, charts, domain grid
+│   │   ├── keyboard.js               # Keyboard shortcuts (?, j/k, /, etc.)
+│   │   ├── main.js                   # Entry: hash router, init, DB selector
+│   │   ├── panel.js                  # Bookmark panel rendering
+│   │   ├── random.js                 # Random view: picker with filters
+│   │   ├── search.js                 # Search logic (title, desc, tags, URL)
+│   │   ├── sidebar.js                # Category sidebar rendering & events
+│   │   └── tag_bar.js                # Tag filter pills UI
 │   │
-│   └── stylesheet/
-│       ├── style.css           # Main (dark theme, CSS vars)
-│       └── themes/light.css    # Light theme overrides
+│   └── stylesheet/                   # CSS
+│       ├── style.css                 # Main styles (dark/light via CSS vars)
+│       └── themes/
+│           └── light.css             # Light theme overrides
 │
-├── src/                        # ── C Source (flat .c/.h pairs) ─────
-│   ├── api.c/.h                # /bookmarks*, /api/databases*
-│   ├── auth.c/.h               # Basic Auth
-│   ├── bookmark_cache.c/.h     # Multi-DB JSON cache (mtime)
-│   ├── common.h                # MAX_BOOKMARK_FILES = 10
-│   ├── databases_meta.c/.h     # stat(), realpath(), user/group names
-│   ├── file.c/.h               # VFS file serving
-│   ├── gen_embedded_front_end_dir.h  # Auto-gen: vfs_entry[]
-│   ├── header_cache.c/.h       # Pre-computed Date/Server/Connection
-│   ├── http.c/.h               # HTTP parser (buffered, in-place)
-│   ├── log.c/.h                # Lock-free SPSC ring logger
-│   ├── main.c                  # CLI (argp), startup
-│   ├── mime.c/.h               # Extension → MIME
-│   ├── project_config.h        # VERSION, BINARY_NAME
-│   ├── ratelimit.c/.h          # Per-IP limit (1024-slot hash)
-│   ├── response.c/.h           # Response builders
-│   ├── server.c/.h             # Accept loop, thread pool, keep-alive
-│   ├── thread_pool.c/.h        # Fixed pool (4096 queue, mutex+condvars)
-│   ├── transport.c/.h          # Opaque fd wrapper, writev, timeouts
-│   └── vfs_hash.c/.h           # FNV-1a + linear probe (O(1) lookup)
+├── src/                              # ── C Source (flat, .c/.h pairs) ──────────────
+│   ├── api.c / .h                    # API endpoints (/bookmarks*, /api/databases*)
+│   ├── auth.c / .h                   # HTTP Basic Auth
+│   ├── bookmark_cache.c / .h         # Multi-DB JSON cache (mtime invalidation)
+│   ├── common.h                      # MAX_BOOKMARK_FILES = 10
+│   ├── databases_meta.c / .h         # File metadata (stat, user/group, realpath)
+│   ├── file.c / .h                   # VFS file serving (embedded frontend)
+│   ├── gen_embedded_front_end_dir.h  # Auto-generated: vfs_entry[] + extern arrays
+│   ├── header_cache.c / .h           # Pre-computed Date/Server/Connection headers
+│   ├── http.c / .h                   # HTTP request parser (buffered, in-place)
+│   ├── log.c / .h                    # Lock-free SPSC ring logger
+│   ├── main.c                        # Entry: argp CLI, validation, startup
+│   ├── mime.c / .h                   # Extension → MIME lookup
+│   ├── project_config.h              # VERSION, BINARY_NAME, HOMEPAGE_URL
+│   ├── ratelimit.c / .h              # Per-IP connection limit (1024-slot hash)
+│   ├── response.c / .h               # Response builders (error, redirect, send)
+│   ├── server.c / .h                 # Accept loop, thread pool dispatch, keep-alive
+│   ├── thread_pool.c / .h            # Fixed-size pool (circular queue, mutex+condvars)
+│   ├── transport.c / .h              # Opaque Transport (fd wrapper, writev, TLS, timeouts)
+│   └── vfs_hash.c / .h               # O(1) VFS hash table (FNV-1a, linear probe)
 │
 └── third_party/
-    └── eduardsui_tlse-v1.0.7/  # TLS lib (not linked in current build)
+    └── eduardsui_tlse-v1.0.7/  # TLS lib (linked via `make tls`)
 ```
 
 ---
@@ -532,14 +592,14 @@ local_marks/
 
 ### `argp.h` not found (macOS)
 
-```bash
+```sh
 brew install argp-standalone
 # Makefile links -largp automatically
 ```
 
 ### Port already in use
 
-```bash
+```sh
 ./local-mark -P 3000 bookmarks.json
 # or
 lsof -ti:8080 | xargs kill -9
@@ -547,7 +607,7 @@ lsof -ti:8080 | xargs kill -9
 
 ### Database not loading / stale data
 
-```bash
+```sh
 # Clear browser IndexedDB
 # In DevTools Console:
 indexedDB.deleteDatabase('LocalMarksCache')
@@ -558,7 +618,7 @@ indexedDB.deleteDatabase('LocalMarksCache')
 
 ### Rate limit hitting
 
-```bash
+```sh
 # Increase or disable
 ./local-mark -M 50 bookmarks.json
 # or
@@ -567,10 +627,28 @@ indexedDB.deleteDatabase('LocalMarksCache')
 
 ### File permission errors
 
-```bash
+```sh
 # Ensure JSON files are readable
 chmod 644 *.json
 ```
+
+### TLS browser warning
+
+```
+NET::ERR_CERT_AUTHORITY_INVALID
+```
+
+**Cause**: Self-signed certificate not trusted by your system.
+
+**Fix** — use `mkcert` instead of raw OpenSSL:
+
+```sh
+brew install mkcert
+mkcert -install     # installs a local CA your browser trusts
+mkcert localhost    # → localhost.pem + localhost-key.pem
+```
+
+Or, if using raw OpenSSL certs, add a security exception: click "Advanced" → "Proceed to localhost".
 
 ### Build warnings
 
@@ -588,6 +666,5 @@ chmod 644 *.json
 ## See Also
 
 - [PROJECT_BRIEF.md](PROJECT_BRIEF.md) — Architecture, module guide, mental model
-- [DEV.md](DEV.md) — Development notes (from live_server reference)
 - [marks2json.py](marks2json.py) — Converter source
 - [AGENTS.md](AGENTS.md) — Agent instructions for this repo

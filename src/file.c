@@ -66,7 +66,7 @@ int file_serve(const HttpRequest *req,
                int                keep_alive)
 {
 	if (req->method != HTTP_GET && req->method != HTTP_HEAD) {
-		response_error(t, 405, "Method Not Allowed", "Only GET and HEAD are supported.");
+		response_error(t, 405, "Only GET and HEAD are supported.");
 		if (print_request)
 			log_request(client_ip, client_port, req, 405, -1, NULL);
 		return 405;
@@ -86,7 +86,7 @@ int file_serve(const HttpRequest *req,
 	const vfs_entry *entry = vfs_lookup(path);
 	if (!entry) {
 		LOG_DEBUG("VFS miss: \"%s\"", path);
-		response_error(t, 404, "Not Found", "File not found.");
+		response_error(t, 404, "File not found.");
 		if (print_request)
 			log_request(client_ip, client_port, req, 404, -1, NULL);
 		return 404;

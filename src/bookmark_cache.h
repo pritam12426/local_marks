@@ -21,6 +21,11 @@ const char *get_cached_bookmark_json(const char *path);
 // Returns pointer to cached buffer, or NULL on error.
 const char *get_cached_bookmark_json_by_index(int index);
 
+// Get a malloc'd copy of cached bookmark JSON and its length.
+// Caller must free() the returned pointer.
+// Returns NULL on error.
+char *get_cached_bookmark_json_copy(int index, size_t *out_len);
+
 // Get length of cached bookmark JSON for a specific database index
 size_t get_cached_bookmark_json_len_by_index(int index);
 

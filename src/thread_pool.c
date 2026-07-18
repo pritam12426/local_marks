@@ -91,8 +91,13 @@ ThreadPool *thread_pool_create(int num_threads)
 		if (pthread_create(&pool->threads[i], NULL, worker_loop, pool) != 0) {
 			LOG_PERROR("pthread_create in thread_pool");
 			atomic_store_explicit(&pool->stop, 1, memory_order_relaxed);
+			pthread_cond_broadcast(&pool->not_empty);
+			pthread_cond_broadcast(&pool->not_full);
 			for (int j = 0; j < i; j++)
 				pthread_join(pool->threads[j], NULL);
+			pthread_mutex_destroy(&pool->lock);
+			pthread_cond_destroy(&pool->not_empty);
+			pthread_cond_destroy(&pool->not_full);
 			free(pool->threads);
 			free(pool);
 			return NULL;

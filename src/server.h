@@ -21,6 +21,12 @@ typedef struct {
 	int thread_pool_size;
 	int keep_alive_timeout;
 	int max_conns_per_ip;
+
+#ifdef SUPPORT_TLS_E
+	const char *tls_cert;
+	const char *tls_key;
+#endif  // SUPPORT_TLS_E
+
 } ServerConfig;
 
 int server_run(const ServerConfig *cfg);

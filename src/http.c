@@ -66,10 +66,12 @@ static ssize_t read_headers(Transport *t, char *buf, size_t max)
 		if (want > 4096) want = 4096;
 		ssize_t rc = transport_read(t, buf + n, want);
 		if (rc <= 0) return -1;
+		size_t prev_n = n;
 		n += (size_t)rc;
 
-		// Scan the tail of the buffer for \r\n\r\n
-		size_t scan = (n >= 4) ? n - 4 : 0;
+		// Scan from prev_n - 3 (overlap with previous data) to catch
+		// \r\n\r\n that spans across two reads
+		size_t scan = (prev_n >= 3) ? prev_n - 3 : 0;
 		for (size_t i = scan; i + 3 < n; i++) {
 			if (buf[i] == '\r' && buf[i+1] == '\n'
 				&& buf[i+2] == '\r' && buf[i+3] == '\n') {
@@ -182,6 +184,7 @@ static void parse_header(char *line, HttpRequest *r)
 					// "bytes=-N" -> suffix range (last N bytes)
 					// range_start is already set to -N by strtoll above
 				} else {
+					errno = 0;
 					r->range_end = (*(dash + 1) != '\0')
 								   ? strtoll(dash + 1, NULL, 10)
 								   : -1;
@@ -280,7 +283,7 @@ void http_send_status(Transport *t, int code, const char *reason, const char *bo
 		"Connection: close\r\n"
 		"\r\n",
 		code, reason, body_len);
-	if ((size_t)n > sizeof(buf)) n = (int)sizeof(buf) - 1;
+	if (n < 0 || (size_t)n >= sizeof(buf)) n = (int)sizeof(buf) - 1;
 	transport_write(t, buf, (size_t)n);
 	if (body && body_len)
 		transport_write(t, body, body_len);
@@ -297,6 +300,6 @@ void http_send_redirect(Transport *t, const char *location)
 		"Connection: close\r\n"
 		"\r\n",
 		location);
-	if ((size_t)n > sizeof(buf)) n = (int)sizeof(buf) - 1;
+	if (n < 0 || (size_t)n >= sizeof(buf)) n = (int)sizeof(buf) - 1;
 	transport_write(t, buf, (size_t)n);
 }

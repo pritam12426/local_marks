@@ -16,15 +16,13 @@ void error_send_json(Transport *t, int status, const char *detail);
 // Send HTML error page (for browser clients)
 void error_send_html(Transport *t, int status, const char *detail);
 
-// Build error JSON string (caller must free)
-char *error_build_json(int status, const char *detail, const char *request_id);
-
-// Free JSON string from error_build_json
-void error_free_json(char *json);
-
 // Check error categories
 int error_is_client_error(int status);
 int error_is_server_error(int status);
+
+// Look up status code text from error table (O(1))
+const char *error_find_code(int status);
+const char *error_find_status_text(int status);
 
 
 #endif  // _ERROR_H_

@@ -29,8 +29,8 @@ void response_send(Transport   *t,
                    int         keep_alive,
                    int         send_body);
 
-// Send a styled HTML error page
-void response_error(Transport *t, int status, const char *status_text, const char *detail);
+// Send a styled HTML error page (status text from error table)
+void response_error(Transport *t, int status, const char *detail);
 
 // Send a 301 redirect
 void response_redirect(Transport *t, const char *location);

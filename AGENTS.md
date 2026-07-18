@@ -39,31 +39,38 @@ Source of truth is `src/main.c` (differs from README):
 | `--max-conns`     | `-M`  | `NUM`     | Max concurrent conns per IP (0 = unlimited)            |
 | `--browser`       | `-B`  | `BROWSER` | Browser to open on startup                             |
 
+TLS flags (`--tls-cert`, `--tls-key`) are conditionally compiled (`-DO_TLS=1`).
+
 Positional `<DB_FILE(s)>...` required (max 10, set in `common.h`).
 
 ## Source layout
 
-| Path                                      | Purpose                                                 |
-| ----------------------------------------- | ------------------------------------------------------- |
-| `src/main.c`                              | Entrypoint — CLI parsing (argp), validation, startup    |
-| `src/server.c` / `src/server.h`           | Accept loop, thread pool dispatch, keep-alive           |
-| `src/http.c` / `src/http.h`               | HTTP request parser (GET/HEAD only, buffered)           |
-| `src/response.c` / `src/response.h`       | HTTP response builder (status, error, redirect)         |
-| `src/transport.c` / `src/transport.h`     | Opaque socket I/O wrapper (handles partial writes)      |
-| `src/auth.c` / `src/auth.h`               | HTTP Basic Authentication                               |
-| `src/ratelimit.c` / `src/ratelimit.h`     | Per-IP connection rate limiting (hash table)            |
-| `src/thread_pool.c` / `src/thread_pool.h` | Fixed-size thread pool (circular buffer)                |
-| `src/mime.c` / `src/mime.h`               | MIME type lookup by extension                           |
-| `src/log.c` / `src/log.h`                 | Thread-safe logger (rwlock), timestamps, colors         |
-| `src/file.c` / `src/file.h`               | VFS-based static file serving (no filesystem access)    |
-| `src/vfs_hash.c` / `src/vfs_hash.h`       | O(1) hash-table lookup for embedded frontend files      |
-| `src/gen_embedded_front_end_dir.h`        | Auto-generated: `vfs_entry` struct + extern arrays      |
-| `src/common.h`                            | Shared constants (MAX_BOOKMARK_FILES)                   |
-| `src/project_config.h`                    | Version, name, metadata                                 |
-| `front_end/`                              | Static SPA (`index.html`, `javascript/`, `stylesheet/`) |
-| `front_end/embed_frontend.bash`           | Script: xxd per-file → C arrays + vfs_entry table       |
-| `marks2json.py`                           | Python converter: `create`/`update`/`find-dead` subcommands |
-| `DEV.md`                                  | Detailed architecture docs (from live_server reference) |
+| Path                                            | Purpose                                                         |
+| ----------------------------------------------- | --------------------------------------------------------------- |
+| `src/main.c`                                    | Entrypoint — CLI parsing (argp), validation, startup           |
+| `src/server.c` / `src/server.h`                 | Accept loop, thread pool dispatch, keep-alive                   |
+| `src/http.c` / `src/http.h`                     | HTTP request parser (GET/HEAD only, buffered)                   |
+| `src/response.c` / `src/response.h`             | HTTP response builder (status, error, redirect)                 |
+| `src/transport.c` / `src/transport.h`           | Opaque socket I/O wrapper (handles partial writes)              |
+| `src/auth.c` / `src/auth.h`                     | HTTP Basic Authentication                                       |
+| `src/ratelimit.c` / `src/ratelimit.h`           | Per-IP connection rate limiting (hash table)                    |
+| `src/thread_pool.c` / `src/thread_pool.h`       | Fixed-size thread pool (circular buffer)                        |
+| `src/mime.c` / `src/mime.h`                     | MIME type lookup by extension                                   |
+| `src/log.c` / `src/log.h`                       | Thread-safe logger (mutex-based), timestamps, colors            |
+| `src/error.c` / `src/error.h`                   | Centralized error handling (JSON + HTML error responses)        |
+| `src/log_middleware.c` / `src/log_middleware.h` | Request/response logging with request ID tracking               |
+| `src/file.c` / `src/file.h`                     | VFS-based static file serving (no filesystem access)            |
+| `src/vfs_hash.c` / `src/vfs_hash.h`             | O(1) hash-table lookup for embedded frontend files              |
+| `src/api.c` / `src/api.h`                       | API endpoints (`/bookmarks*`, `/api/databases*`)                |
+| `src/bookmark_cache.c` / `src/bookmark_cache.h` | Multi-DB JSON cache (mtime invalidation)                        |
+| `src/databases_meta.c` / `src/databases_meta.h` | File metadata (stat, user/group, realpath)                      |
+| `src/header_cache.c` / `src/header_cache.h`     | Pre-computed Date/Server/Connection headers                     |
+| `src/gen_embedded_front_end_dir.h`              | Auto-generated: `vfs_entry` struct + extern arrays              |
+| `src/common.h`                                  | Shared constants (MAX_BOOKMARK_FILES)                           |
+| `src/project_config.h`                          | Version, name, metadata                                         |
+| `front_end/`                                    | Static SPA (`index.html`, `javascript/`, `stylesheet/`)         |
+| `front_end/embed_frontend.bash`                 | Script: xxd per-file → C arrays + vfs_entry table              |
+| `marks2json.py`                                 | Python converter: `create` / `update` / `find-dead` subcommands |
 
 ## Architecture
 
@@ -74,6 +81,9 @@ optionally loops for keep-alive.
 
 Key lookup: `vfs_lookup("index.html")` returns an embedded `vfs_entry`
 from the hash table (no filesystem access for frontend files).
+
+Request flow: `http_parse_request()` → `auth_check()` (if configured) →
+`api_handle_request()` (API routes first) → `file_serve()` (VFS fallback).
 
 ## Database Loading Behavior (Current)
 
@@ -110,15 +120,17 @@ LOG_PERROR("bind failed");    // logs message + appends perror
 ```
 
 - Call `log_init()` before any LOG macro.
-- Thread-safe (pthread_rwlock). Writes to stderr or `--log-file`.
+- Thread-safe (pthread_mutex). Writes to stderr or `--log-file`.
+- Log macros take variadic string args (not printf format).
 
 ## Conventions
 
 - `.clang-tidy` enforces clang-analyzer, readability, modernize, bugprone,
   misc-include-cleaner, llvm-header-guard.
-- No test framework exists.
+- No test framework exists — verify with `make clean && make` (clean rebuild, no warnings).
 - Header guard style: `_FILENAME_H_` (double underscore prefix/suffix).
+- Tabs for C/Makefile, 4-space indentation for Python.
 - Source copied from [live_server](https://github.com/pritam12426/live_server)
   (`server.c`, `http.c`, `response.c`, `transport.c`, `auth.c`, `thread_pool.c`,
   `ratelimit.c`, `mime.c`) — adapted to serve embedded VFS files instead of
-  real filesystem files. `DEV.md` documents the original architecture.
+  real filesystem files. `PROJECT_BRIEF.md` documents the original architecture.
