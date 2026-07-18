@@ -25,14 +25,6 @@ CURL ?= curl -fsSL
 O_DEBUG := 0  ## Debug binary (1 = debug,   0 = release)
 O_TLS   := 0  ## Support TLS  (1 = enable,  0 = disable)
 
-ifneq ($(filter debug,$(MAKECMDGOALS)),)
-	O_DEBUG := 1
-endif
-
-ifneq ($(filter TlS,$(MAKECMDGOALS)),)
-	O_TLS := 1
-endif
-
 ifeq ($(strip $(O_DEBUG)),1)
 	CFLAGS += -g3 -DDEBUG -DLOG_SHOW_SOURCE_LOCATION
 
@@ -62,9 +54,12 @@ MARKS2JSON  =  marks2json.py
 BIN         =  local-mark
 
 # TLS support (tlse library)
-TLS_DIR     =  third_party/tlse
-# TLS_GITHUB  =  https://github.com/eduardsui/tlse/raw/master
-TLS_GITHUB  = https://raw.githubusercontent.com/eduardsui/tlse/refs/tags/v1.0.7
+TLS_DIR     =  third_party/eduardsui_tlse
+TLS_GITHUB  =  https://raw.githubusercontent.com/eduardsui/tlse/refs/tags/v1.0.7
+
+# cJson support (tlse library)
+CJSON_DIR     =  third_party/cJson
+CJSON_GITHUB  = https://raw.githubusercontent.com/DaveGamble/cJSON/refs/tags/v1.7.19
 
 
 FRONT_END_FILES = \
@@ -106,11 +101,11 @@ OUT       = $(SRC:%.c=$(BUILD)/%.o)
 DEP       = $(OUT:.o=.d)
 
 # TLS flags + objects (appended to OUT when enabled)
+TLS_HEADER_DEP :=
 ifeq ($(strip $(O_TLS)),1)
-	CFLAGS   += -DSUPPORT_TLS_E -I$(TLS_DIR)
-	# SRC      += $(wildcard third_party/tlse/*.c)
-	OUT      += $(BUILD)/third_party/tlse/tlse.o
-	HEADERS  += $(TLS_DIR)/tlse.h
+	CFLAGS         += -DSUPPORT_TLS_E -I$(TLS_DIR)
+	OUT            += $(BUILD)/$(TLS_DIR)/tlse.o
+	TLS_HEADER_DEP := $(TLS_DIR)/tlse.h
 
     ifeq ($(strip $(O_DEBUG)),1)
 		CFLAGS += -DLTM_DESC
@@ -135,14 +130,14 @@ help:  ## Show this help
 
 	@echo
 	@echo "TLS Examples:"
-	@echo "  make TlS                  # Build with TLS support"
-	@echo "  make TlS O_DEBUG=1        # Debug build with TLS"
+	@echo "  make tls                  # Build with TLS support"
+	@echo "  make tls O_DEBUG=1        # Debug build with TLS"
 	@echo "  make download-tls         # Download TLS files only"
 
 $(BUILD):  ## Create build directories automatically
 	mkdir -p $(BUILD)
 
-$(BUILD)/%.o: %.c | $(FRONT_END_GENERATED_H)
+$(BUILD)/%.o: %.c | $(FRONT_END_GENERATED_H) $(TLS_HEADER_DEP)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
@@ -182,26 +177,27 @@ $(TLS_DIR)/tlse.h: | $(TLS_DIR)
 	$(CURL) -o $@ $(TLS_GITHUB)/tlse.h
 
 # Explicit rule (not pattern) so the generic $(BUILD)/%.o rule can't shadow it
-$(BUILD)/third_party/tlse/tlse.o: $(TLS_DIR)/tlse.c $(TLS_DIR)/libtomcrypt.c $(TLS_DIR)/tlse.h | $(BUILD)
+$(BUILD)/$(TLS_DIR)/tlse.o: $(TLS_DIR)/tlse.c $(TLS_DIR)/libtomcrypt.c $(TLS_DIR)/tlse.h | $(BUILD)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -DTLS_AMALGAMATION -w -MMD -MP -c $(TLS_DIR)/tlse.c -o $@
 
 # Download TLS files only
+download-tls:  ## Download the tlse sources into third_party/ without building
 download-tls: $(TLS_DIR)/libtomcrypt.c $(TLS_DIR)/tlse.c $(TLS_DIR)/tlse.h
 	@echo "TLS files downloaded to $(TLS_DIR)/"
 
-clean-tls:  ## Remove downloaded TLS files
-	$(RM) -rf $(TLS_DIR) $(BUILD)/third_party
+clean-tls:  ## Remove downloaded TLS sources and their build objects
+	$(RM) -rf $(TLS_DIR) $(BUILD)/$(TLS_DIR)
 
 # ── Build targets ────────────────────────────────────────────────────────────
 
 $(BIN): $(OUT) $(FRONT_END_GENERATED_O) ## Build the local-mark binary
 	$(CC) $(LDFLAGS) -o $@ $(OUT) $(FRONT_END_GENERATED_O) $(LDLIBS)
 
-debug:  ## Build the debug binary run `make debug O_DEBUG=1`
+debug:  ## Build the debug binary — run `make debug`
 	$(MAKE) $(BIN) O_DEBUG=1
 
-TlS:  ## Build the binary with TLS support run `make TlS O_TLS=1`
+tls:  ## Build with TLS support (downloads tlse into third_party/ on first run) — run `make tls`
 	$(MAKE) $(BIN) O_TLS=1
 
 install: all  ## Install the local-mark binary
@@ -213,7 +209,7 @@ install: all  ## Install the local-mark binary
 	$(INSTALL) -m 0755 local-mark.1 $(DESTDIR)$(MANPREFIX)/man1/$(BIN).1
 
 clean:  ## Clean up build artifacts
-	$(RM) -rf $(OUT) $(DEP) $(BIN) $(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_H)
+	$(RM) -rf $(OUT) $(DEP) $(BIN) $(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_H) $(BUILD)/$(TLS_DIR)
 
 uninstall:  ## Uninstall the local-mark binary
 	$(RM) $(DESTDIR)$(PREFIX)/bin/$(BIN)
@@ -223,4 +219,4 @@ uninstall:  ## Uninstall the local-mark binary
 strip: $(BIN)  ## Strip the local-mark binary
 	$(STRIP) $^
 
-.PHONY: all install uninstall strip clean debug clean-tls download-tls
+.PHONY: all help install uninstall strip clean debug tls clean-tls download-tls

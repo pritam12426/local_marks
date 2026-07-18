@@ -62,12 +62,12 @@ typedef struct {
 	int          keep_alive;       // -K: keep-alive timeout (default: 3)
 	int          max_conns;        // -M: max conns per IP (default: 0 = unlimited)
 
-	const char    *log_file;      // -F: Where it has to append logs instead of STDERR
-	bool           print_request; // -R: log every request
-	Log_level_t    log_level;     // -L: verbosity threshold
+	const char  *log_file;      // -F: Where it has to append logs instead of STDERR
+	bool         print_request; // -R: log every request
+	Log_level_t  log_level;     // -L: verbosity threshold
 
-	const char   *bookmark_files[MAX_BOOKMARK_FILES];  // positional: JSON DB file(s)
-	int           bookmark_file_count;                 // number of bookmark files provided
+	const char  *bookmark_files[MAX_BOOKMARK_FILES];  // positional: JSON DB file(s)
+	int          bookmark_file_count;                 // number of bookmark files provided
 
 #ifdef SUPPORT_TLS_E
 	const char *tls_cert;
@@ -88,7 +88,6 @@ static Arguments G_Args = {
 
 	.log_file        = NULL, // NULL => stderr
 	.print_request   = false,
-	.browser         = NULL,
 	.log_level       = LOG_LEVEL_INFO,
 
 	.bookmark_file_count = 0,
