@@ -60,7 +60,7 @@ static void *worker_loop(void *arg)
 		pthread_cond_signal(&pool->not_full);
 		pthread_mutex_unlock(&pool->lock);
 
-		LOG_DEBUG("Worker picked up task (queue depth: %d)", depth);
+		LOG_TRACE("Worker picked up task (queue depth: %d)", depth);
 		task.func(task.arg);
 	}
 
@@ -89,7 +89,7 @@ ThreadPool *thread_pool_create(int num_threads)
 
 	for (int i = 0; i < num_threads; i++) {
 		if (pthread_create(&pool->threads[i], NULL, worker_loop, pool) != 0) {
-			LOG_PERROR("pthread_create in thread_pool");
+			LOG_FATAL("pthread_create in thread_pool");
 			atomic_store_explicit(&pool->stop, 1, memory_order_relaxed);
 			pthread_cond_broadcast(&pool->not_empty);
 			pthread_cond_broadcast(&pool->not_full);
@@ -126,7 +126,7 @@ void thread_pool_submit(ThreadPool *pool, ThreadTaskFunc func, void *arg)
 	pool->tail = (pool->tail + 1) % QUEUE_CAPACITY;
 	pool->count++;
 
-	LOG_DEBUG("Task submitted to pool (queue depth: %d)", pool->count);
+	LOG_TRACE("Task submitted to pool (queue depth: %d)", pool->count);
 
 	pthread_cond_signal(&pool->not_empty);
 	pthread_mutex_unlock(&pool->lock);

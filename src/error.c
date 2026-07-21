@@ -9,7 +9,7 @@
 #include <string.h>
 #include <time.h>
 
-// #include "log.h"
+#include "log.h"
 #include "project_config.h"
 #include "transport.h"
 // #include "header_cache.h"

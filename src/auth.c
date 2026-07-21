@@ -90,25 +90,25 @@ int auth_check(const HttpRequest *req,
 	int user_set = expected_user && *expected_user;
 	int pass_set = expected_pass && *expected_pass;
 
-	LOG_DEBUG("auth_check: user_set=%d, pass_set=%d",
+	LOG_TRACE("auth_check: user_set=%d, pass_set=%d",
               user_set, pass_set);
 
 	// If neither user nor pass is configured, auth is disabled
 	if (!user_set && !pass_set) {
-		LOG_DEBUG("Auth disabled — no credentials configured, granting access");
+		LOG_TRACE("Auth disabled — no credentials configured, granting access");
 		return 1;
 	}
 
 	const char *hdr = req->auth;
 	if (!hdr) {
-		LOG_DEBUG("No Authorization header present");
+		LOG_TRACE("No Authorization header present");
 		return 0;
 	}
-	LOG_DEBUG("Authorization header: %s", hdr);
+	LOG_TRACE("Authorization header: %s", hdr);
 
 	// Must be "Basic …"
 	if (strncasecmp(hdr, "Basic ", 6) != 0) {
-		LOG_DEBUG("Authorization scheme is not Basic (got: %.20s)", hdr);
+		LOG_TRACE("Authorization scheme is not Basic (got: %.20s)", hdr);
 		return 0;
 	}
 
@@ -119,15 +119,15 @@ int auth_check(const HttpRequest *req,
 	char decoded[512];
 	int  dec_len = b64_decode(b64, decoded, (int)sizeof decoded);
 	if (dec_len < 0) {
-		LOG_DEBUG("Base64 decode failed");
+		LOG_TRACE("Base64 decode failed");
 		return 0;
 	}
-	LOG_DEBUG("Base64 decoded (%d bytes)", dec_len);
+	LOG_TRACE("Base64 decoded (%d bytes)", dec_len);
 
 	// Split on ":" to get user:pass
 	char *colon = strchr(decoded, ':');
 	if (!colon) {
-		LOG_DEBUG("Decoded credentials missing ':' separator");
+		LOG_TRACE("Decoded credentials missing ':' separator");
 		return 0;
 	}
 	*colon = '\0';
@@ -139,7 +139,7 @@ int auth_check(const HttpRequest *req,
 
 	int ok = (strcmp(got_user, want_user) == 0 &&
 			  strcmp(got_pass, want_pass) == 0);
-	LOG_DEBUG("Auth result: %s", ok ? "ACCEPT" : "REJECT");
+	LOG_TRACE("Auth result: %s", ok ? "ACCEPT" : "REJECT");
 	return ok ? 1 : 0;
 }
 

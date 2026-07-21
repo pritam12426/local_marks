@@ -44,16 +44,16 @@ void vfs_hash_init(void)
 	memset(slots, 0, sizeof slots);
 
 	size_t inserted = 0;
-	for (size_t i = 0; vfs[i].file_path; i++) {
+	for (size_t i = 0; vfs_table[i].file_path; i++) {
 		if (inserted >= VFS_HASH_CAP) {
-			LOG_ERROR("vfs_hash: %zu embedded files exceed VFS_HASH_CAP=%d; "
+			LOG_FATAL("vfs_hash: %zu embedded files exceed VFS_HASH_CAP=%d; "
 			          "raise VFS_MAX_FILES in vfs_hash.c",
 			          inserted + 1,
 			          VFS_HASH_CAP);
 			abort();
 		}
 
-		uint32_t idx    = fnv1a(vfs[i].file_path) & (VFS_HASH_CAP - 1);
+		uint32_t idx    = fnv1a(vfs_table[i].file_path) & (VFS_HASH_CAP - 1);
 		size_t   probes = 0;
 		while (slots[idx] != NULL) {
 			idx = (idx + 1) & (VFS_HASH_CAP - 1); /* linear probing */
@@ -61,17 +61,17 @@ void vfs_hash_init(void)
 			if (probes >= VFS_HASH_CAP) {
 				/* Table is completely full: without this bound, the loop
 				 * above would spin forever since no empty slot exists. */
-				LOG_ERROR("vfs_hash: hash table full while inserting \"%s\"; "
-				          "raise VFS_MAX_FILES in vfs_hash.c",
-				          vfs[i].file_path);
+			LOG_FATAL("vfs_hash: hash table full while inserting \"%s\"; "
+			          "raise VFS_MAX_FILES in vfs_hash.c",
+			          vfs_table[i].file_path);
 				abort();
 			}
 		}
-		slots[idx] = &vfs[i];
-		LOG_DEBUG("vfs_hash: inserted \"%s\" at slot %u (%zu probes)",
-		          vfs[i].file_path,
-		          idx,
-		          probes);
+		slots[idx] = &vfs_table[i];
+		LOG_TRACE("vfs_hash: inserted \"%s\" at slot %u (%zu probes)",
+			          vfs_table[i].file_path,
+			          idx,
+			          probes);
 		inserted++;
 	}
 
@@ -82,10 +82,10 @@ void vfs_hash_init(void)
 		         VFS_HASH_CAP);
 	}
 
-	LOG_DEBUG("vfs_hash: initialized with %zu files in %d slots (load factor %.0f%%)",
-	          inserted,
-	          VFS_HASH_CAP,
-	          (double) inserted * 100.0 / VFS_HASH_CAP);
+		LOG_TRACE("vfs_hash: initialized with %zu files in %d slots (load factor %.0f%%)",
+			          inserted,
+			          VFS_HASH_CAP,
+			          (double) inserted * 100.0 / VFS_HASH_CAP);
 }
 
 const vfs_entry *vfs_lookup(const char *path)
@@ -94,16 +94,17 @@ const vfs_entry *vfs_lookup(const char *path)
 	for (size_t i = 0; i < VFS_HASH_CAP; i++) {
 		const vfs_entry *e = slots[idx];
 		if (e == NULL) {
-			LOG_DEBUG("vfs_hash: lookup \"%s\" -> miss (%zu probes)", path, i);
+			LOG_TRACE("vfs_hash: lookup \"%s\" -> miss (%zu probes)", path, i);
 			return NULL; /* empty slot: definitely not present (no deletions occur) */
 		}
 		if (strcmp(e->file_path, path) == 0) {
-			LOG_DEBUG("vfs_hash: lookup \"%s\" -> hit (%zu probes)", path, i);
+			LOG_TRACE("vfs_hash: lookup \"%s\" -> hit (%zu probes)", path, i);
 			return e;
 		}
 		idx = (idx + 1) & (VFS_HASH_CAP - 1);
 	}
 
 	LOG_DEBUG("vfs_hash: lookup \"%s\" -> miss (table exhausted)", path);
+
 	return NULL;
 }

@@ -79,7 +79,6 @@ dkms.conf
 # End of https://www.toptal.com/developers/gitignore/api/c
 
 /build
-/src/gen_embedded_front_end_dir.h
 /local-mark
 *.json
 *.log

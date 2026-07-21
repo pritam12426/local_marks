@@ -133,7 +133,7 @@ int ratelimit_accept(RateLimit *rl, const char *ip)
 				return -1;
 			}
 			rl->table[slot].count++;
-			LOG_DEBUG("Rate limit accept: %s (count=%d/%d)",
+			LOG_TRACE("Rate limit accept: %s (count=%d/%d)",
 			          ip, rl->table[slot].count, rl->max_per_ip);
 			pthread_mutex_unlock(&rl->lock);
 			return 0;
@@ -157,7 +157,7 @@ void ratelimit_leave(RateLimit *rl, const char *ip)
 		size_t slot = (idx + i) % rl->table_size;
 		if (rl->table[slot].count > 0 && strcmp(rl->table[slot].ip, ip) == 0) {
 			rl->table[slot].count--;
-			LOG_DEBUG("Rate limit leave: %s (count=%d)", ip, rl->table[slot].count);
+			LOG_TRACE("Rate limit leave: %s (count=%d)", ip, rl->table[slot].count);
 			if (rl->table[slot].count == 0) {
 				free(rl->table[slot].ip);
 				rl->table[slot].ip = NULL;

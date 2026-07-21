@@ -55,7 +55,7 @@ Transport *transport_new(int fd)
 	int one = 1;
 	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
 
-	LOG_DEBUG("Transport created (fd=%d)", fd);
+	LOG_TRACE("Transport created (fd=%d)", fd);
 	return t;
 }
 
@@ -274,7 +274,7 @@ void transport_close(Transport *t)
 #endif  // SUPPORT_TLS_E
 
 	if (t->fd >= 0) {
-		LOG_DEBUG("Closing socket (fd=%d)", t->fd);
+		LOG_TRACE("Closing socket (fd=%d)", t->fd);
 		close(t->fd);
 		t->fd = -1;
 	}
@@ -296,7 +296,7 @@ int transport_set_timeout(Transport *t, int seconds)
 	if (!t || t->fd < 0) return -1;
 	struct timeval tv = { .tv_sec = seconds, .tv_usec = 0 };
 	int rc = setsockopt(t->fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
-	LOG_DEBUG("Set SO_RCVTIMEO=%ds on fd=%d → %d", seconds, t->fd, rc);
+	LOG_TRACE("Set SO_RCVTIMEO=%ds on fd=%d -> %d", seconds, t->fd, rc);
 	return rc;
 }
 

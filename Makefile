@@ -81,7 +81,7 @@ FRONT_END_FILES = \
 
 FRONT_END_SCRIPT       = front_end/embed_frontend.bash
 FRONT_END_GENERATED_C  = $(BUILD)/gen_embedded_front_end_dir.c
-FRONT_END_GENERATED_H  = src/gen_embedded_front_end_dir.h
+EMBD_FRONT_END_H       = src/embd_front_end.h
 FRONT_END_GENERATED_O  = $(BUILD)/gen_embedded_front_end_dir.o
 
 # Compiler warnings
@@ -151,7 +151,7 @@ $(BUILD)/%.o: %.c | $(FRONT_END_GENERATED_H) $(TLS_HEADER_DEP)
 # Regenerate when any frontend file or the script itself changes
 $(FRONT_END_GENERATED_C): $(FRONT_END_FILES) $(FRONT_END_SCRIPT)
 	@OUT_C_FILE="$(FRONT_END_GENERATED_C)" \
-	OUT_H_FILE="$(FRONT_END_GENERATED_H)" \
+	OUT_H_FILE="$(EMBD_FRONT_END_H)" \
 	TARGET_FILES="$(FRONT_END_FILES)" \
 	bash $(FRONT_END_SCRIPT)
 

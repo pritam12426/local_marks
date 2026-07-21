@@ -39,7 +39,7 @@ static void header_cache_update_date(void)
 	gmtime_r(&now, &tm);
 	strftime(hc_date, sizeof hc_date,
 	         "Date: %a, %d %b %Y %H:%M:%S GMT\r\n", &tm);
-	LOG_DEBUG("Header cache Date updated: %.*s", (int)sizeof(hc_date) - 2, hc_date);
+	LOG_TRACE("Header cache Date updated: %.*s", (int)sizeof(hc_date) - 2, hc_date);
 }
 
 // Initialize static headers

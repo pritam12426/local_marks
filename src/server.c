@@ -158,7 +158,7 @@ static int make_listener(const char *host, int port)
 	freeaddrinfo(res);
 
 	if (lfd < 0) {
-		LOG_ERROR("Could not bind to %s:%d", host, port);
+		LOG_FATAL("Could not bind to %s:%d", host, port);
 		return -1;
 	}
 
@@ -253,7 +253,7 @@ int server_run(const ServerConfig *cfg)
 
 	ThreadPool *pool = thread_pool_create(cfg->thread_pool_size);
 	if (!pool) {
-		LOG_ERROR("Failed to create thread pool");
+		LOG_FATAL("Failed to create thread pool");
 		close(lfd);
 		return -1;
 	}
@@ -346,7 +346,7 @@ int server_run(const ServerConfig *cfg)
 		if (cfd < 0) {
 			if (errno == EINTR) continue;
 			if (atomic_load_explicit(&g_shutdown, memory_order_relaxed)) break;
-			LOG_WARN("accept: %m");
+			LOG_PERROR("accept");
 			continue;
 		}
 

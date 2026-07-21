@@ -17,7 +17,7 @@ make install                   # installs to PREFIX (default /usr/local)
 - Compiler: clang, `-std=c17`, source in `src/*.{c,h}`, objects → `build/`.
 - macOS prerequisite: `brew install argp-standalone` (links `-largp`).
 - Linux: `-D_GNU_SOURCE` is added automatically.
-- Build flags always on: `LOG_SHOW_TIME_STAMP`, `LOG_SHOW_SOURCE_LOCATION` (README incorrectly says the latter is debug-only).
+- `LOG_SHOW_TIME_STAMP` is always on. `LOG_SHOW_SOURCE_LOCATION` is debug-only (`-DDEBUG`).
 - Debug builds enable `-fsanitize=address`, `-fsanitize=undefined`, `-fstack-usage`.
 - Frontend embedding: `front_end/embed_frontend.bash` runs `xxd -i` per file → C arrays + `vfs_entry` table in `build/gen_embedded_front_end_dir.c` + `src/gen_embedded_front_end_dir.h`. The script gzip-compresses each file before embedding. The Makefile re-runs it when any `FRONT_END_FILES` or the script changes.
 
@@ -113,15 +113,17 @@ marks2json find-dead -T bookmarks.json --healthy healthy.json
 ## Logging
 
 ```c
-LOG_INFO("started on port ", port);
-LOG_ERROR("failed: ", strerror(errno));
-LOG_DEBUG("bookmark count: ", count);
+LOG_INFO("started on port %d", port);
+LOG_ERROR("failed: %s", strerror(errno));
+LOG_DEBUG("bookmark count: %zu", count);
 LOG_PERROR("bind failed");    // logs message + appends perror
 ```
 
-- Call `log_init()` before any LOG macro.
+- Call `log_init(file_path, level, flags)` before any LOG macro.
 - Thread-safe (pthread_mutex). Writes to stderr or `--log-file`.
-- Log macros take variadic string args (not printf format).
+- Log macros are printf-style (format string + args).
+- Levels: `LOG_LEVEL_FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`.
+- Flags: `LOG_FLAG_SHOW_TIMESTAMP`, `LOG_FLAG_SHOW_SOURCE` (bitmask).
 
 ## Conventions
 

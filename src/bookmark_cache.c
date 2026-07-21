@@ -34,7 +34,7 @@ static int load_bookmark_json(const char *path, bookmark_cache_entry_t *entry)
 
 	FILE *f = fopen(path, "rb");
 	if (!f) {
-		LOG_ERROR("Failed to open bookmark file '%s': %s", path, strerror(errno));
+		LOG_FATAL("Failed to open bookmark file '%s': %s", path, strerror(errno));
 		return -1;
 	}
 
@@ -55,7 +55,7 @@ static int load_bookmark_json(const char *path, bookmark_cache_entry_t *entry)
 
 	entry->json = malloc((size_t)size + 1);
 	if (!entry->json) {
-		LOG_ERROR("Failed to allocate %ld bytes for bookmark JSON", size);
+		LOG_FATAL("Failed to allocate %ld bytes for bookmark JSON", size);
 		fclose(f);
 		return -1;
 	}
