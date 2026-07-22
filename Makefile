@@ -1,18 +1,3 @@
-# Makefile — local-mark build system
-#
-# Targets:
-#   all     — release build (-O3)
-#   debug   — debug build (-g3 -DDEBUG)
-#   strip   — strip debug symbols
-#   install — install to PREFIX
-#   uninstall
-#   clean
-#
-# Options (set via environment or on the command line):
-#   make debug -B O_DEBUG=1  — debug build
-#
-# macOS prerequisite: brew install argp-standalone
-
 UNAME_S := $(shell uname -s)
 
 PREFIX ?= /usr/local
@@ -22,8 +7,18 @@ INSTALL ?= install
 CURL ?= curl -fsSL
 
 # Convert targets to flags for backwards compatibility
-O_DEBUG := 0  ## Debug binary (1 = debug,   0 = release)
-O_TLS   := 0  ## Support TLS  (1 = enable,  0 = disable)
+# Build options (set via command line, e.g. `make O_DEBUG=1`)
+O_DEBUG := 0                     ## Enable debug build (ASan, UBSan, -g3)
+O_LOG_SHOW_SOURCE_LOCATION := 1  ## Prepend [file:line:func] to log output
+O_LOG_SHOW_TIME_STAMP := 1       ## Prepend [HH:MM:SS.ffffff] to log output
+O_TLS := 0                       ## Support TLS (1 = enable,  0 = disable)
+
+# Auto-enable flags for debug builds
+ifneq ($(filter debug,$(MAKECMDGOALS)),)
+	O_DEBUG := 1
+	O_LOG_SHOW_SOURCE_LOCATION := 1
+	O_LOG_SHOW_TIME_STAMP := 1
+endif
 
 ifeq ($(strip $(O_DEBUG)),1)
 	CFLAGS += -g3 -DDEBUG -DLOG_SHOW_SOURCE_LOCATION
@@ -38,6 +33,15 @@ ifeq ($(strip $(O_DEBUG)),1)
     endif
 else
 	CFLAGS += -O3
+endif
+
+# Convert O_ variables to -D flags
+ifeq ($(strip $(O_LOG_SHOW_SOURCE_LOCATION)),1)
+	CFLAGS += -DLOG_SHOW_SOURCE_LOCATION
+endif
+
+ifeq ($(strip $(O_LOG_SHOW_TIME_STAMP)),1)
+	CFLAGS += -DLOG_SHOW_TIME_STAMP
 endif
 
 # Platform-specific settings
@@ -56,10 +60,6 @@ BIN         =  local-mark
 # TLS support (tlse library)
 TLS_DIR     =  third_party/eduardsui_tlse
 TLS_GITHUB  =  https://raw.githubusercontent.com/eduardsui/tlse/refs/tags/v1.0.7
-
-# cJson support (tlse library)
-CJSON_DIR     =  third_party/cJson
-CJSON_GITHUB  = https://raw.githubusercontent.com/DaveGamble/cJSON/refs/tags/v1.7.19
 
 
 FRONT_END_FILES = \
@@ -120,7 +120,7 @@ help:  ## Show this help
 	@awk 'BEGIN {FS="  ## "} \
 		/^O_[a-zA-Z_]+[[:space:]]*:=/ { \
 		split($$1, a, /[[:space:]]*:=/); \
-		printf "  \033[36m%-20s\033[0m %s\n", a[1], $$2; \
+		printf "  \033[36m%-30s\033[0m %s\n", a[1], $$2; \
 	}' $(MAKEFILE_LIST)
 
 	@echo
@@ -132,7 +132,7 @@ help:  ## Show this help
 	@echo "TLS Examples:"
 	@echo "  make tls                  # Build with TLS support"
 	@echo "  make tls O_DEBUG=1        # Debug build with TLS"
-	@echo "  make download-tls         # Download TLS files only"
+	@echo "  make download-tls         # Download TLS files from \`github.com/eduardsui/tlse\`"
 
 $(BUILD):  ## Create build directories automatically
 	mkdir -p $(BUILD)
@@ -194,7 +194,7 @@ $(BIN): $(OUT) $(FRONT_END_GENERATED_O) ## Build the local-mark binary
 debug:  ## Build the debug binary — run `make debug`
 	$(MAKE) $(BIN) O_DEBUG=1
 
-tls:  ## Build with TLS support (downloads tlse into third_party / on first run) — run `make tls`
+tls:  ## Build with TLS support (downloads tlse into third_party/ on first run) — run `make tls`
 	$(MAKE) $(BIN) O_TLS=1
 
 install: all  ## Install the local-mark binary
