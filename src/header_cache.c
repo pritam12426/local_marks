@@ -87,7 +87,8 @@ const char *header_cache_conn(int keep_alive)
 	return keep_alive ? hc_conn_keep_alive : hc_conn_close;
 }
 
-// Build a complete HTTP response header from pre-computed components
+// Build a complete HTTP response header from pre-computed components.
+// Pass content_type = NULL to omit the Content-Type header.
 int header_cache_build(char *buf, size_t buf_len,
                        int status, const char *status_text,
                        const char *content_type,
@@ -101,54 +102,40 @@ int header_cache_build(char *buf, size_t buf_len,
 	const char *server = header_cache_server();
 	const char *conn = header_cache_conn(keep_alive);
 
-	int len = snprintf(buf, buf_len,
-	                   "HTTP/1.1 %d %s\r\n"
-	                   "%s"
-	                   "%s"
-	                   "Content-Type: %s\r\n"
-	                   "Content-Length: %zu\r\n"
-	                   "%s"
-	                   "%s"
-	                   "\r\n",
-	                   status, status_text,
-	                   date_buf,
-	                   server,
-	                   content_type ? content_type : "",
-	                   content_length,
-	                   extra_headers ? extra_headers : "",
-	                   conn);
-
-	if ((size_t)len >= buf_len) return -1;
-	return len;
-}
-
-// Overload for responses without Content-Type (e.g., 304, 204)
-int header_cache_build_no_type(char *buf, size_t buf_len,
-                               int status, const char *status_text,
-                               size_t content_length,
-                               const char *extra_headers,
-                               int keep_alive)
-{
-	char date_buf[64];
-	if (header_cache_date_copy(date_buf, sizeof date_buf) != 0)
-		date_buf[0] = '\0';
-	const char *server = header_cache_server();
-	const char *conn = header_cache_conn(keep_alive);
-
-	int len = snprintf(buf, buf_len,
-	                   "HTTP/1.1 %d %s\r\n"
-	                   "%s"
-	                   "%s"
-	                   "Content-Length: %zu\r\n"
-	                   "%s"
-	                   "%s"
-	                   "\r\n",
-	                   status, status_text,
-	                   date_buf,
-	                   server,
-	                   content_length,
-	                   extra_headers ? extra_headers : "",
-	                   conn);
+	int len;
+	if (content_type) {
+		len = snprintf(buf, buf_len,
+		                   "HTTP/1.1 %d %s\r\n"
+		                   "%s"
+		                   "%s"
+		                   "Content-Type: %s\r\n"
+		                   "Content-Length: %zu\r\n"
+		                   "%s"
+		                   "%s"
+		                   "\r\n",
+		                   status, status_text,
+		                   date_buf,
+		                   server,
+		                   content_type,
+		                   content_length,
+		                   extra_headers ? extra_headers : "",
+		                   conn);
+	} else {
+		len = snprintf(buf, buf_len,
+		                   "HTTP/1.1 %d %s\r\n"
+		                   "%s"
+		                   "%s"
+		                   "Content-Length: %zu\r\n"
+		                   "%s"
+		                   "%s"
+		                   "\r\n",
+		                   status, status_text,
+		                   date_buf,
+		                   server,
+		                   content_length,
+		                   extra_headers ? extra_headers : "",
+		                   conn);
+	}
 
 	if ((size_t)len >= buf_len) return -1;
 	return len;

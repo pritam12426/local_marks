@@ -17,8 +17,9 @@
 // Initialize the header cache (call once at startup)
 void header_cache_init(void);
 
-// Build a complete HTTP response header using cached components
-// Returns header length, or -1 if buffer too small
+// Build a complete HTTP response header using cached components.
+// Pass content_type = NULL to omit the Content-Type header (e.g. 304, 204).
+// Returns header length, or -1 if buffer too small.
 int header_cache_build(char       *buf,
                        size_t      buf_len,
                        int         status,
@@ -27,15 +28,6 @@ int header_cache_build(char       *buf,
                        size_t      content_length,
                        const char *extra_headers,
                        int         keep_alive);
-
-// Build header without Content-Type (for 304, 204, etc.)
-int header_cache_build_no_type(char       *buf,
-                               size_t      buf_len,
-                               int         status,
-                               const char *status_text,
-                               size_t      content_length,
-                               const char *extra_headers,
-                               int         keep_alive);
 
 // Copy cached Date header into caller's buffer (thread-safe)
 // Returns 0 on success, -1 on buffer too small

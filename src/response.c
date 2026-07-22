@@ -44,10 +44,10 @@ void response_send(Transport  *t,
 		                             mime, body_len,
 		                             extra_hdrs, keep_alive);
 	} else {
-		hdr_len = header_cache_build_no_type(hdr, sizeof hdr,
-		                                     status, status_text,
-		                                     body_len,
-		                                     extra_hdrs, keep_alive);
+		hdr_len = header_cache_build(hdr, sizeof hdr,
+		                             status, status_text,
+		                             NULL, body_len,
+		                             extra_hdrs, keep_alive);
 	}
 
 	if (hdr_len < 0) {
@@ -170,12 +170,6 @@ void response_error(Transport *t, int status, const char *detail)
 	response_send(t, status, status_text, "text/html; charset=utf-8", NULL, body, (size_t) blen, 0, 1);
 }
 
-// Send a 301 redirect to the given URL
-void response_redirect(Transport *t, const char *location)
-{
-	char extra[512];
-	snprintf(extra, sizeof extra, "Location: %s\r\n", location);
-	response_send(t, 301, "Moved Permanently", NULL, extra, NULL, 0, 0, 1);
-}
+
 // SSE helpers are in livereload.c (they write directly via transport_write).
 // These three wrappers were removed as dead code — no caller used them.

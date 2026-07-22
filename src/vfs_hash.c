@@ -1,9 +1,9 @@
 #include "vfs_hash.h"
 
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "fnv1a.h"
 #include "log.h"
 
 /* ---- The one knob: set this to (at least) how many files you embed. ----
@@ -29,16 +29,6 @@
 
 static const vfs_entry *slots[VFS_HASH_CAP];
 
-static uint32_t fnv1a(const char *s)
-{
-	uint32_t h = 2166136261u;
-	for (; *s; s++) {
-		h ^= (unsigned char) *s;
-		h *= 16777619u;
-	}
-	return h;
-}
-
 void vfs_hash_init(void)
 {
 	memset(slots, 0, sizeof slots);
@@ -53,7 +43,7 @@ void vfs_hash_init(void)
 			abort();
 		}
 
-		uint32_t idx    = fnv1a(vfs_table[i].file_path) & (VFS_HASH_CAP - 1);
+		uint32_t idx    = fnv1a_str(vfs_table[i].file_path) & (VFS_HASH_CAP - 1);
 		size_t   probes = 0;
 		while (slots[idx] != NULL) {
 			idx = (idx + 1) & (VFS_HASH_CAP - 1); /* linear probing */
@@ -90,7 +80,7 @@ void vfs_hash_init(void)
 
 const vfs_entry *vfs_lookup(const char *path)
 {
-	uint32_t idx = fnv1a(path) & (VFS_HASH_CAP - 1);
+	uint32_t idx = fnv1a_str(path) & (VFS_HASH_CAP - 1);
 	for (size_t i = 0; i < VFS_HASH_CAP; i++) {
 		const vfs_entry *e = slots[idx];
 		if (e == NULL) {

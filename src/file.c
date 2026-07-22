@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "fnv1a.h"
 #include "log.h"
 #include "mime.h"
 #include "project_config.h"
@@ -14,16 +15,6 @@
 static void build_etag(uint32_t content_hash, size_t file_len, char *buf, size_t len)
 {
 	snprintf(buf, len, "\"%08x-%zx\"", content_hash, file_len);
-}
-
-static uint32_t fnv1a_hash(const unsigned char *data, size_t len)
-{
-	uint32_t h = 2166136261u;
-	for (size_t i = 0; i < len; i++) {
-		h ^= data[i];
-		h *= 16777619u;
-	}
-	return h;
 }
 
 static void log_request(const char        *client_ip,
@@ -99,7 +90,7 @@ int file_serve(const HttpRequest *req,
 	int         is_gzipped = (len >= 2 && data[0] == 0x1f && data[1] == 0x8b);
 
 	/* Generate ETag from content hash + size */
-	uint32_t content_hash = fnv1a_hash(data, len);
+	uint32_t content_hash = fnv1a_data(data, len);
 	char     etag[64];
 	build_etag(content_hash, len, etag, sizeof etag);
 

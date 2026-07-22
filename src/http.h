@@ -48,13 +48,11 @@ int http_parse_request(Transport *t, HttpRequest *out);
 
 // Low-level response helpers (used internally by response.c)
 void http_send_status(Transport *t, int code, const char *reason, const char *body);
-void http_send_redirect(Transport *t, const char *location);
 
 // URL percent-decoding utility
 void http_url_decode(char *dst, size_t dst_size, const char *src);
 
-// Lookup helpers
-const char *http_status_text(int code);
+// Lookup helper
 const char *http_method_str(HttpMethod m);
 
 

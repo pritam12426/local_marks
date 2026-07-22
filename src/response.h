@@ -32,9 +32,6 @@ void response_send(Transport   *t,
 // Send a styled HTML error page (status text from error table)
 void response_error(Transport *t, int status, const char *detail);
 
-// Send a 301 redirect
-void response_redirect(Transport *t, const char *location);
-
 // (SSE helpers live in livereload.h — not here)
 
 

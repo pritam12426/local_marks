@@ -17,7 +17,7 @@ make install                   # installs to PREFIX (default /usr/local)
 - Compiler: clang, `-std=c17`, source in `src/*.{c,h}`, objects → `build/`.
 - macOS prerequisite: `brew install argp-standalone` (links `-largp`).
 - Linux: `-D_GNU_SOURCE` is added automatically.
-- `LOG_SHOW_TIME_STAMP` is always on. `LOG_SHOW_SOURCE_LOCATION` is debug-only (`-DDEBUG`).
+- `LOG_SHOW_TIME_STAMP` and `LOG_SHOW_SOURCE_LOCATION` are always on.
 - Debug builds enable `-fsanitize=address`, `-fsanitize=undefined`, `-fstack-usage`.
 - Frontend embedding: `front_end/embed_frontend.bash` runs `xxd -i` per file → C arrays + `vfs_entry` table in `build/gen_embedded_front_end_dir.c` + `src/gen_embedded_front_end_dir.h`. The script gzip-compresses each file before embedding. The Makefile re-runs it when any `FRONT_END_FILES` or the script changes.
 
@@ -25,19 +25,19 @@ make install                   # installs to PREFIX (default /usr/local)
 
 Source of truth is `src/main.c` (differs from README):
 
-| Flags             | Short | Value     | Description                                            |
-| ----------------- | ----- | --------- | ------------------------------------------------------ |
-| `--log-level`     | `-L`  | `LEVEL`   | Log level: error/warn/info/debug (default info)        |
-| `--log-file`      | `-F`  | `FILE`    | Append logs to file (default stderr)                   |
-| `--print-request` | `-R`  |           | Log each client request and its headers                |
-| `--user`          | `-u`  | `USER`    | Basic auth username                                    |
-| `--pass`          | `-p`  | `PASS`    | Basic auth password                                    |
-| `--port`          | `-P`  | `PORT`    | TCP port (default 8080)                                |
-| `--host`          | `-H`  | `HOST`    | Bind address (default localhost)                       |
-| `--threads`       | `-T`  | `NUM`     | Thread pool size (default 2)                           |
-| `--keep-alive`    | `-K`  | `SECS`    | Keep-alive timeout in seconds (default 3, 0 = disable) |
-| `--max-conns`     | `-M`  | `NUM`     | Max concurrent conns per IP (0 = unlimited)            |
-| `--browser`       | `-B`  | `BROWSER` | Browser to open on startup                             |
+| Flags             | Short | Value     | Description                                                     |
+| ----------------- | ----- | --------- | --------------------------------------------------------------- |
+| `--log-level`     | `-L`  | `LEVEL`   | Log level: off/fatal/error/warn/info/debug/trace (default info) |
+| `--log-file`      | `-F`  | `FILE`    | Append logs to file (default stderr)                            |
+| `--print-request` | `-R`  |           | Log each client request and its headers                         |
+| `--user`          | `-u`  | `USER`    | Basic auth username                                             |
+| `--pass`          | `-p`  | `PASS`    | Basic auth password                                             |
+| `--port`          | `-P`  | `PORT`    | TCP port (default 8080)                                         |
+| `--host`          | `-H`  | `HOST`    | Bind address (default localhost)                                |
+| `--threads`       | `-T`  | `NUM`     | Thread pool size (default 2)                                    |
+| `--keep-alive`    | `-K`  | `SECS`    | Keep-alive timeout in seconds (default 3, 0 = disable)          |
+| `--max-conns`     | `-M`  | `NUM`     | Max concurrent conns per IP (0 = unlimited)                     |
+| `--browser`       | `-B`  | `BROWSER` | Browser to open on startup                                      |
 
 TLS flags (`--tls-cert`, `--tls-key`) are conditionally compiled (`-DO_TLS=1`).
 
@@ -47,7 +47,7 @@ Positional `<DB_FILE(s)>...` required (max 10, set in `common.h`).
 
 | Path                                            | Purpose                                                         |
 | ----------------------------------------------- | --------------------------------------------------------------- |
-| `src/main.c`                                    | Entrypoint — CLI parsing (argp), validation, startup           |
+| `src/main.c`                                    | Entrypoint — CLI parsing (argp), validation, startup            |
 | `src/server.c` / `src/server.h`                 | Accept loop, thread pool dispatch, keep-alive                   |
 | `src/http.c` / `src/http.h`                     | HTTP request parser (GET/HEAD only, buffered)                   |
 | `src/response.c` / `src/response.h`             | HTTP response builder (status, error, redirect)                 |
@@ -56,7 +56,7 @@ Positional `<DB_FILE(s)>...` required (max 10, set in `common.h`).
 | `src/ratelimit.c` / `src/ratelimit.h`           | Per-IP connection rate limiting (hash table)                    |
 | `src/thread_pool.c` / `src/thread_pool.h`       | Fixed-size thread pool (circular buffer)                        |
 | `src/mime.c` / `src/mime.h`                     | MIME type lookup by extension                                   |
-| `src/log.c` / `src/log.h`                       | Thread-safe logger (mutex-based), timestamps, colors            |
+| `src/log.c` / `src/log.h`                       | Thread-safe logger (lock-free SPSC ring), timestamps, colors    |
 | `src/error.c` / `src/error.h`                   | Centralized error handling (JSON + HTML error responses)        |
 | `src/log_middleware.c` / `src/log_middleware.h` | Request/response logging with request ID tracking               |
 | `src/file.c` / `src/file.h`                     | VFS-based static file serving (no filesystem access)            |
@@ -65,11 +65,12 @@ Positional `<DB_FILE(s)>...` required (max 10, set in `common.h`).
 | `src/bookmark_cache.c` / `src/bookmark_cache.h` | Multi-DB JSON cache (mtime invalidation)                        |
 | `src/databases_meta.c` / `src/databases_meta.h` | File metadata (stat, user/group, realpath)                      |
 | `src/header_cache.c` / `src/header_cache.h`     | Pre-computed Date/Server/Connection headers                     |
+| `src/embd_front_end.h`                          | Frontend embedding declarations (included by `file.c`)          |
 | `src/gen_embedded_front_end_dir.h`              | Auto-generated: `vfs_entry` struct + extern arrays              |
 | `src/common.h`                                  | Shared constants (MAX_BOOKMARK_FILES)                           |
 | `src/project_config.h`                          | Version, name, metadata                                         |
 | `front_end/`                                    | Static SPA (`index.html`, `javascript/`, `stylesheet/`)         |
-| `front_end/embed_frontend.bash`                 | Script: xxd per-file → C arrays + vfs_entry table              |
+| `front_end/embed_frontend.bash`                 | Script: xxd per-file → C arrays + vfs_entry table               |
 | `marks2json.py`                                 | Python converter: `create` / `update` / `find-dead` subcommands |
 
 ## Architecture
@@ -119,11 +120,11 @@ LOG_DEBUG("bookmark count: %zu", count);
 LOG_PERROR("bind failed");    // logs message + appends perror
 ```
 
-- Call `log_init(file_path, level, flags)` before any LOG macro.
-- Thread-safe (pthread_mutex). Writes to stderr or `--log-file`.
+- Call `log_init(file_path, level)` before any LOG macro.
+- Lock-free SPSC ring buffer (4096 slots). Dedicated consumer thread drains to file.
+- Thread-safe producers lock-free via `atomic_fetch_add`. Writes to stderr or `--log-file`.
 - Log macros are printf-style (format string + args).
-- Levels: `LOG_LEVEL_FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`.
-- Flags: `LOG_FLAG_SHOW_TIMESTAMP`, `LOG_FLAG_SHOW_SOURCE` (bitmask).
+- Levels: `LOG_LEVEL_OFF`, `FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`.
 
 ## Conventions
 

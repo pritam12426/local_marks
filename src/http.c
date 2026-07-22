@@ -252,25 +252,6 @@ const char *http_method_str(HttpMethod m)
 	}
 }
 
-// Return the standard reason phrase for a given HTTP status code
-const char *http_status_text(int code)
-{
-	switch (code) {
-		case 200: return "OK";
-		case 206: return "Partial Content";
-		case 301: return "Moved Permanently";
-		case 304: return "Not Modified";
-		case 400: return "Bad Request";
-		case 401: return "Unauthorized";
-		case 403: return "Forbidden";
-		case 404: return "Not Found";
-		case 405: return "Method Not Allowed";
-		case 416: return "Range Not Satisfiable";
-		case 500: return "Internal Server Error";
-		default:  return "Unknown";
-	}
-}
-
 // Send a minimal HTTP status response (text/html body)
 void http_send_status(Transport *t, int code, const char *reason, const char *body)
 {
@@ -289,17 +270,3 @@ void http_send_status(Transport *t, int code, const char *reason, const char *bo
 		transport_write(t, body, body_len);
 }
 
-// Send an HTTP 301 redirect to the given location
-void http_send_redirect(Transport *t, const char *location)
-{
-	char buf[4096];
-	int n = snprintf(buf, sizeof(buf),
-		"HTTP/1.1 301 Moved Permanently\r\n"
-		"Location: %s\r\n"
-		"Content-Length: 0\r\n"
-		"Connection: close\r\n"
-		"\r\n",
-		location);
-	if (n < 0 || (size_t)n >= sizeof(buf)) n = (int)sizeof(buf) - 1;
-	transport_write(t, buf, (size_t)n);
-}
