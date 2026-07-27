@@ -204,6 +204,7 @@ static void peer_addr(int fd, char *ip_buf, size_t ip_len, int *port_out)
 	}
 }
 
+#ifdef SUPPORT_TLS_E
 static void open_browser(const char *browser, const char *host, int port, bool tls)
 {
 	char url[256];
@@ -212,7 +213,6 @@ static void open_browser(const char *browser, const char *host, int port, bool t
 
 	pid_t pid = fork();
 	if (pid == 0) {
-		// Child: avoid LOG_* (inherits parent's locked mutexes → deadlock)
 		execlp(browser, browser, url, (char *)NULL);
 #if defined(__linux__)
 		execlp("xdg-open", "xdg-open", url, (char *)NULL);
@@ -226,6 +226,29 @@ static void open_browser(const char *browser, const char *host, int port, bool t
 		LOG_PERROR("fork for browser open");
 	}
 }
+#else
+static void open_browser(const char *browser, const char *host, int port)
+{
+	char url[256];
+	snprintf(url, sizeof url, "http://%s:%d", host, port);
+	LOG_INFO("Opening browser: %s %s", browser, url);
+
+	pid_t pid = fork();
+	if (pid == 0) {
+		execlp(browser, browser, url, (char *)NULL);
+#if defined(__linux__)
+		execlp("xdg-open", "xdg-open", url, (char *)NULL);
+#elif defined(__APPLE__)
+		execlp("open", "open", url, (char *)NULL);
+#endif
+		_exit(1);
+	}
+
+	if (pid < 0) {
+		LOG_PERROR("fork for browser open");
+	}
+}
+#endif  // SUPPORT_TLS_E
 
 #ifdef SUPPORT_TLS_E
 // Read a file into a malloc'd buffer. Caller must free().
@@ -336,20 +359,25 @@ int server_run(const ServerConfig *cfg)
 	}
 #endif  // SUPPORT_TLS_E
 
-	bool tls_enabled = false;
 #ifdef SUPPORT_TLS_E
-	tls_enabled = (tls_master != NULL);
-#endif  // SUPPORT_TLS_E
-
+	bool tls_enabled = (tls_master != NULL);
 	LOG_INFO("Serving on http%s://%s:%d", tls_enabled ? "s" : "", cfg->host, cfg->port);
+#else
+	LOG_INFO("Serving on http://%s:%d", cfg->host, cfg->port);
+#endif  // SUPPORT_TLS_E
 	LOG_INFO("Thread pool: %d workers", cfg->thread_pool_size);
 	if (cfg->keep_alive_timeout > 0)
 		LOG_INFO("Keep-alive: %ds timeout", cfg->keep_alive_timeout);
 	if (cfg->max_conns_per_ip > 0)
 		LOG_INFO("Rate limit: %d conns/IP", cfg->max_conns_per_ip);
 
+#ifdef SUPPORT_TLS_E
 	if (cfg->browser)
 		open_browser(cfg->browser, cfg->host, cfg->port, tls_enabled);
+#else
+	if (cfg->browser)
+		open_browser(cfg->browser, cfg->host, cfg->port);
+#endif  // SUPPORT_TLS_E
 
 	while (!atomic_load_explicit(&g_shutdown, memory_order_relaxed)) {
 		struct sockaddr_storage client_addr;

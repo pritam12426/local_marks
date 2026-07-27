@@ -306,12 +306,9 @@ int transport_fd(const Transport *t)
 	return t ? t->fd : -1;
 }
 
+#ifdef SUPPORT_TLS_E
 bool transport_is_tls(const Transport *t)
 {
-#ifdef SUPPORT_TLS_E
 	return t && t->tls_ctx != NULL;
-#else
-	(void)t;
-	return false;
-#endif  // SUPPORT_TLS_E
 }
+#endif  // SUPPORT_TLS_E

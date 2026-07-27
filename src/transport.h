@@ -50,7 +50,10 @@ int transport_set_timeout(Transport *t, int seconds);
 
 // Accessors
 int transport_fd(const Transport *t);
+
+#ifdef SUPPORT_TLS_E
 bool transport_is_tls(const Transport *t);
+#endif  // SUPPORT_TLS_E
 
 #ifdef SUPPORT_TLS_E
 // Attach a TLS context to this transport (for accepted connections).
