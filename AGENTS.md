@@ -17,6 +17,7 @@ make install                   # installs to PREFIX (default /usr/local)
 - Compiler: clang, `-std=c17`, source in `src/*.{c,h}`, objects → `build/`.
 - macOS prerequisite: `brew install argp-standalone` (links `-largp`).
 - Linux: `-D_GNU_SOURCE` is added automatically.
+- Frontend embedding also requires `gzip` and `xxd` (both ship with macOS; on Linux install via `apt install xxd gzip`).
 - `LOG_SHOW_TIME_STAMP` and `LOG_SHOW_SOURCE_LOCATION` are always on.
 - Debug builds enable `-fsanitize=address`, `-fsanitize=undefined`, `-fstack-usage`.
 - Frontend embedding: `front_end/embed_frontend.bash` runs `xxd -i` per file → C arrays + `vfs_entry` table in `build/gen_embedded_front_end_dir.c` + `src/gen_embedded_front_end_dir.h`. The script gzip-compresses each file before embedding. The Makefile re-runs it when any `FRONT_END_FILES` or the script changes.
@@ -67,11 +68,13 @@ Positional `<DB_FILE(s)>...` required (max 10, set in `common.h`).
 | `src/header_cache.c` / `src/header_cache.h`     | Pre-computed Date/Server/Connection headers                     |
 | `src/embd_front_end.h`                          | Frontend embedding declarations (included by `file.c`)          |
 | `src/gen_embedded_front_end_dir.h`              | Auto-generated: `vfs_entry` struct + extern arrays              |
+| `src/fnv1a.h`                                   | Header-only FNV-1a hash (used by `vfs_hash.c`)                 |
 | `src/common.h`                                  | Shared constants (MAX_BOOKMARK_FILES)                           |
 | `src/project_config.h`                          | Version, name, metadata                                         |
 | `front_end/`                                    | Static SPA (`index.html`, `javascript/`, `stylesheet/`)         |
 | `front_end/embed_frontend.bash`                 | Script: xxd per-file → C arrays + vfs_entry table               |
 | `marks2json.py`                                 | Python converter: `create` / `update` / `find-dead` subcommands |
+| `local-mark.1`                                  | Man page (installed to `$(MANPREFIX)/man1/`)                    |
 
 ## Architecture
 
@@ -133,7 +136,10 @@ LOG_PERROR("bind failed");    // logs message + appends perror
 - No test framework exists — verify with `make clean && make` (clean rebuild, no warnings).
 - Header guard style: `_FILENAME_H_` (double underscore prefix/suffix).
 - Tabs for C/Makefile, 4-space indentation for Python.
+- `*.json` is gitignored — bookmark files (`bookmarks*.json`) must be force-added
+  with `git add -f` if committing them.
+- `compile_commands.json` in the repo root is generated for clangd/IDE navigation.
 - Source copied from [live_server](https://github.com/pritam12426/live_server)
   (`server.c`, `http.c`, `response.c`, `transport.c`, `auth.c`, `thread_pool.c`,
   `ratelimit.c`, `mime.c`) — adapted to serve embedded VFS files instead of
-  real filesystem files. `PROJECT_BRIEF.md` documents the original architecture.
+  real filesystem files.

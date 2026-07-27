@@ -57,16 +57,11 @@ int header_cache_date_copy(char *buf, size_t buf_len)
 	static time_t last_update = 0;
 	time_t now = time(NULL);
 
-	if (now != last_update) {
-		pthread_mutex_lock(&hc_mutex);
-		if (now != last_update) {
-			header_cache_update_date();
-			last_update = now;
-		}
-		pthread_mutex_unlock(&hc_mutex);
-	}
-	// Copy under lock to avoid reading while another thread writes
 	pthread_mutex_lock(&hc_mutex);
+	if (now != last_update) {
+		header_cache_update_date();
+		last_update = now;
+	}
 	size_t len = strlen(hc_date);
 	if (len >= buf_len) {
 		pthread_mutex_unlock(&hc_mutex);

@@ -16,16 +16,19 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "log.h"
 
 #define RL_INITIAL_SIZE 256
 #define RL_MAX_LOAD_FACTOR 0.75
 #define RL_GROWTH_FACTOR 2
+#define RL_STALE_TIMEOUT_SECS 60
 
 typedef struct {
 	char  *ip;   // Dynamically allocated IP string
 	int   count;
+	time_t last_activity;  // Last time this entry was touched
 } RLEntry;
 
 struct RateLimit {
@@ -53,7 +56,7 @@ static int ratelimit_grow(RateLimit *rl)
 	RLEntry *new_table = calloc(new_size, sizeof(RLEntry));
 	if (!new_table) return -1;
 
-	// Rehash all existing entries
+	// Rehash all existing entries (skip stale zero-count entries)
 	for (size_t i = 0; i < rl->table_size; i++) {
 		if (rl->table[i].count > 0) {
 			unsigned long idx = hash_ip(rl->table[i].ip) % new_size;
@@ -64,6 +67,8 @@ static int ratelimit_grow(RateLimit *rl)
 					break;
 				}
 			}
+		} else if (rl->table[i].ip) {
+			free(rl->table[i].ip);
 		}
 	}
 
@@ -71,6 +76,22 @@ static int ratelimit_grow(RateLimit *rl)
 	rl->table = new_table;
 	rl->table_size = new_size;
 	return 0;
+}
+
+// Evict entries with count == 0 that haven't been touched recently.
+// Caller must hold rl->lock.
+static void ratelimit_sweep_stale(RateLimit *rl)
+{
+	time_t now = time(NULL);
+	for (size_t i = 0; i < rl->table_size; i++) {
+		if (rl->table[i].count == 0 && rl->table[i].ip != NULL) {
+			if (now - rl->table[i].last_activity > RL_STALE_TIMEOUT_SECS) {
+				free(rl->table[i].ip);
+				rl->table[i].ip = NULL;
+				rl->used--;
+			}
+		}
+	}
 }
 
 RateLimit *ratelimit_create(int max_conns_per_ip)
@@ -101,6 +122,9 @@ int ratelimit_accept(RateLimit *rl, const char *ip)
 
 	pthread_mutex_lock(&rl->lock);
 
+	// Sweep stale entries before checking load factor
+	ratelimit_sweep_stale(rl);
+
 	// Check load factor and grow if needed (using integer math to avoid float conversion)
 	if (rl->used * 4 >= rl->table_size * 3) {
 		if (ratelimit_grow(rl) != 0) {
@@ -109,24 +133,27 @@ int ratelimit_accept(RateLimit *rl, const char *ip)
 	}
 
 	unsigned long idx = hash_ip(ip) % rl->table_size;
+	time_t now = time(NULL);
 
 	// Linear probe: find either an empty slot or this IP's slot
 	for (size_t i = 0; i < rl->table_size; i++) {
 		size_t slot = (idx + i) % rl->table_size;
-		if (rl->table[slot].count == 0) {
-			// New entry
+		if (rl->table[slot].count == 0 && rl->table[slot].ip == NULL) {
+			// New entry (or reclaimed stale entry)
 			rl->table[slot].ip = strdup(ip);
 			if (!rl->table[slot].ip) {
 				pthread_mutex_unlock(&rl->lock);
 				return -1;
 			}
 			rl->table[slot].count = 1;
+			rl->table[slot].last_activity = now;
 			rl->used++;
 			pthread_mutex_unlock(&rl->lock);
 			return 0;
 		}
 		if (strcmp(rl->table[slot].ip, ip) == 0) {
 			// Existing entry
+			rl->table[slot].last_activity = now;
 			if (rl->table[slot].count >= rl->max_per_ip) {
 				LOG_WARN("Rate limit exceeded for %s (%d)", ip, rl->table[slot].count);
 				pthread_mutex_unlock(&rl->lock);
@@ -152,11 +179,13 @@ void ratelimit_leave(RateLimit *rl, const char *ip)
 	pthread_mutex_lock(&rl->lock);
 
 	unsigned long idx = hash_ip(ip) % rl->table_size;
+	time_t now = time(NULL);
 
 	for (size_t i = 0; i < rl->table_size; i++) {
 		size_t slot = (idx + i) % rl->table_size;
 		if (rl->table[slot].count > 0 && strcmp(rl->table[slot].ip, ip) == 0) {
 			rl->table[slot].count--;
+			rl->table[slot].last_activity = now;
 			LOG_TRACE("Rate limit leave: %s (count=%d)", ip, rl->table[slot].count);
 			if (rl->table[slot].count == 0) {
 				free(rl->table[slot].ip);

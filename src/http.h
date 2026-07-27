@@ -20,6 +20,7 @@ typedef enum {
 } HttpMethod;
 
 // Parsed HTTP request — all fields are null-terminated strings
+// The raw buffer is heap-allocated by http_parse_request and freed by http_request_cleanup.
 typedef struct {
 	HttpMethod method;                 // GET, HEAD, or OTHER
 	char       method_str[16];         // Raw method string (e.g. "GET", "POST", "DELETE")
@@ -38,13 +39,17 @@ typedef struct {
 	int64_t    range_start;            // Range start (-1 = not specified / suffix)
 	int64_t    range_end;              // Range end   (-1 = open-ended)
 
-	char       raw[8192];              // Raw request data (request line + all headers)
+	char      *raw;                    // Heap-allocated raw request data (freed by http_request_cleanup)
 	size_t     raw_len;                // Length of raw data
 } HttpRequest;
 
-// Parse a complete HTTP request from the transport
-// Returns 0 on success, -1 on error
+// Parse a complete HTTP request from the transport.
+// Allocates raw buffer internally; caller must call http_request_cleanup when done.
+// Returns 0 on success, -1 on error.
 int http_parse_request(Transport *t, HttpRequest *out);
+
+// Free resources owned by an HttpRequest (the raw buffer).
+void http_request_cleanup(HttpRequest *req);
 
 // Low-level response helpers (used internally by response.c)
 void http_send_status(Transport *t, int code, const char *reason, const char *body);

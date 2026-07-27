@@ -19,10 +19,12 @@
 #include <stddef.h>
 
 typedef void (*ThreadTaskFunc)(void *arg);
+typedef void (*ThreadTaskDropFunc)(void *arg);
 
 typedef struct {
-	ThreadTaskFunc func;
-	void          *arg;
+	ThreadTaskFunc    func;
+	ThreadTaskDropFunc drop_func;  // Called when task is dropped (e.g. on shutdown). NULL = no-op.
+	void             *arg;
 } ThreadTask;
 
 typedef struct ThreadPool ThreadPool;
@@ -30,8 +32,9 @@ typedef struct ThreadPool ThreadPool;
 // Create a pool with num_threads workers (clamped 1–256)
 ThreadPool *thread_pool_create(int num_threads);
 
-// Submit a task for asynchronous execution
-void thread_pool_submit(ThreadPool *pool, ThreadTaskFunc func, void *arg);
+// Submit a task for asynchronous execution.
+// drop_func is called with arg if the task is dropped (e.g. on shutdown). NULL = no-op.
+void thread_pool_submit(ThreadPool *pool, ThreadTaskFunc func, ThreadTaskDropFunc drop_func, void *arg);
 
 // Stop all workers and free resources
 void thread_pool_destroy(ThreadPool *pool);

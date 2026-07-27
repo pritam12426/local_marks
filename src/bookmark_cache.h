@@ -13,14 +13,6 @@ void bookmark_cache_cleanup(void);
 // Add a database path to the cache (call for each DB during startup)
 void bookmark_cache_add_db(const char *path);
 
-// Get cached bookmark JSON for a specific path, loading/refreshing based on mtime.
-// Returns pointer to cached buffer (valid until next reload), or NULL on error.
-const char *get_cached_bookmark_json(const char *path);
-
-// Get cached bookmark JSON for a specific database by index.
-// Returns pointer to cached buffer, or NULL on error.
-const char *get_cached_bookmark_json_by_index(int index);
-
 // Get a malloc'd copy of cached bookmark JSON and its length.
 // Caller must free() the returned pointer.
 // Returns NULL on error.

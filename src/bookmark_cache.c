@@ -123,24 +123,6 @@ void bookmark_cache_add_db(const char *path)
 	pthread_mutex_unlock(&g_bookmark_cache_mutex);
 }
 
-// Find or create cache entry for a path
-static bookmark_cache_entry_t *get_or_create_entry(const char *path)
-{
-	for (int i = 0; i < g_db_cache_count; i++) {
-		if (strcmp(g_db_cache[i].path, path) == 0) {
-			return &g_db_cache[i];
-		}
-	}
-	if (g_db_cache_count < MAX_BOOKMARK_FILES) {
-		bookmark_cache_entry_t *entry = &g_db_cache[g_db_cache_count];
-		strncpy(entry->path, path, sizeof(entry->path) - 1);
-		entry->path[sizeof(entry->path) - 1] = '\0';
-		g_db_cache_count++;
-		return entry;
-	}
-	return NULL;
-}
-
 // Ensure a cache entry is loaded and up-to-date.
 // Returns entry with valid json on success, or NULL on failure.
 // Caller must hold g_bookmark_cache_mutex.
@@ -168,36 +150,6 @@ static bookmark_cache_entry_t *ensure_loaded(bookmark_cache_entry_t *entry)
 			return NULL;
 	}
 	return entry;
-}
-
-const char *get_cached_bookmark_json(const char *path)
-{
-	if (!path) return NULL;
-
-	pthread_mutex_lock(&g_bookmark_cache_mutex);
-
-	bookmark_cache_entry_t *entry = get_or_create_entry(path);
-	if (!entry) {
-		pthread_mutex_unlock(&g_bookmark_cache_mutex);
-		return NULL;
-	}
-
-	bookmark_cache_entry_t *ok = ensure_loaded(entry);
-	pthread_mutex_unlock(&g_bookmark_cache_mutex);
-	return ok ? ok->json : NULL;
-}
-
-const char *get_cached_bookmark_json_by_index(int index)
-{
-	pthread_mutex_lock(&g_bookmark_cache_mutex);
-	if (index < 0 || index >= g_db_cache_count) {
-		pthread_mutex_unlock(&g_bookmark_cache_mutex);
-		return NULL;
-	}
-
-	bookmark_cache_entry_t *ok = ensure_loaded(&g_db_cache[index]);
-	pthread_mutex_unlock(&g_bookmark_cache_mutex);
-	return ok ? ok->json : NULL;
 }
 
 char *get_cached_bookmark_json_copy(int index, size_t *out_len)

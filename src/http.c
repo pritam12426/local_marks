@@ -55,6 +55,8 @@ void http_url_decode(char *dst, size_t dst_size, const char *src)
 	dst[di] = '\0';
 }
 
+#define HTTP_RAW_BUF_SIZE 8192
+
 // Read HTTP headers in buffered chunks until \r\n\r\n is found.
 // Returns total bytes read (including the blank line), or -1 on error.
 static ssize_t read_headers(Transport *t, char *buf, size_t max)
@@ -132,6 +134,12 @@ static int parse_request_line(char *line, HttpRequest *r)
 	LOG_DEBUG("Request line: %s %s -> %s (qs=%s) %s",
 	          http_method_str(r->method), uri, r->path, r->query, r->version);
 
+	// Reject null bytes in decoded path (bypasses string-based checks)
+	if (strlen(r->path) != strnlen(r->path, sizeof(r->path))) {
+		LOG_WARN("Null byte in decoded path blocked: %s", r->path);
+		return -1;
+	}
+
 	// Basic path-traversal check at parse time (defence-in-depth)
 	if (strstr(r->path, "..")) {
 		LOG_WARN("Path traversal attempt blocked: %s", r->path);
@@ -205,11 +213,21 @@ int http_parse_request(Transport *t, HttpRequest *out)
 	memset(out, 0, sizeof(*out));
 	out->range_start = -1;
 	out->range_end   = -1;
+	out->raw = NULL;
+
+	// Heap-allocate the raw buffer to keep HttpRequest small on the stack
+	out->raw = malloc(HTTP_RAW_BUF_SIZE);
+	if (!out->raw) {
+		LOG_ERROR("Failed to allocate raw request buffer");
+		return -1;
+	}
 
 	// Read raw bytes up to the end of headers
-	ssize_t len = read_headers(t, out->raw, sizeof(out->raw) - 1);
+	ssize_t len = read_headers(t, out->raw, HTTP_RAW_BUF_SIZE - 1);
 	if (len <= 0) {
 		LOG_WARN("Failed to read request headers on fd=%d", transport_fd(t));
+		free(out->raw);
+		out->raw = NULL;
 		return -1;
 	}
 	out->raw_len = (size_t)len;
@@ -249,6 +267,16 @@ const char *http_method_str(HttpMethod m)
 	case HTTP_GET:  return "GET";
 	case HTTP_HEAD: return "HEAD";
 	default:        return "?";
+	}
+}
+
+// Free resources owned by an HttpRequest (the raw buffer)
+void http_request_cleanup(HttpRequest *req)
+{
+	if (req && req->raw) {
+		free(req->raw);
+		req->raw = NULL;
+		req->raw_len = 0;
 	}
 }
 

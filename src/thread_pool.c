@@ -108,7 +108,7 @@ ThreadPool *thread_pool_create(int num_threads)
 	return pool;
 }
 
-void thread_pool_submit(ThreadPool *pool, ThreadTaskFunc func, void *arg)
+void thread_pool_submit(ThreadPool *pool, ThreadTaskFunc func, ThreadTaskDropFunc drop_func, void *arg)
 {
 	if (!pool) return;
 
@@ -119,10 +119,12 @@ void thread_pool_submit(ThreadPool *pool, ThreadTaskFunc func, void *arg)
 
 	if (atomic_load_explicit(&pool->stop, memory_order_relaxed)) {
 		pthread_mutex_unlock(&pool->lock);
+		if (drop_func && arg)
+			drop_func(arg);
 		return;
 	}
 
-	pool->queue[pool->tail] = (ThreadTask){ .func = func, .arg = arg };
+	pool->queue[pool->tail] = (ThreadTask){ .func = func, .drop_func = drop_func, .arg = arg };
 	pool->tail = (pool->tail + 1) % QUEUE_CAPACITY;
 	pool->count++;
 

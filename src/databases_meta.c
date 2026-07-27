@@ -15,6 +15,45 @@
 #include "project_config.h"
 #include "server.h"
 
+// Escape a string for safe inclusion in a JSON string value.
+// Writes to `dst` with at most `dst_size` bytes (including NUL).
+// Returns the number of bytes written (excluding NUL), or -1 on truncation.
+static size_t json_escape_string(char *dst, size_t dst_size, const char *src)
+{
+	size_t di = 0;
+	for (const char *p = src; *p; p++) {
+		char esc = 0;
+		switch (*p) {
+		case '\"': esc = '"';  break;
+		case '\\': esc = '\\'; break;
+		case '\b': esc = 'b';  break;
+		case '\f': esc = 'f';  break;
+		case '\n': esc = 'n';  break;
+		case '\r': esc = 'r';  break;
+		case '\t': esc = 't';  break;
+		default:
+			if ((unsigned char)*p < 0x20) {
+				// Control character → \u00XX
+				if (di + 6 >= dst_size) return (size_t)-1;
+				snprintf(dst + di, dst_size - di, "\\u%04x", (unsigned char)*p);
+				di += 6;
+				continue;
+			}
+			// Regular character
+			if (di + 1 >= dst_size) return (size_t)-1;
+			dst[di++] = *p;
+			continue;
+		}
+		// Escaped character: \X
+		if (di + 2 >= dst_size) return (size_t)-1;
+		dst[di++] = '\\';
+		dst[di++] = esc;
+	}
+	if (di >= dst_size) return (size_t)-1;
+	dst[di] = '\0';
+	return di;
+}
+
 JSON_DB_meta_data g_db_meta[MAX_BOOKMARK_FILES];
 int g_db_meta_count = 0;
 
@@ -108,11 +147,15 @@ void populate_db_meta_all(const ServerConfig *cfg)
 // Caller must free the returned string
 char *build_databases_json(void)
 {
-	// Each entry: absolute_path (PATH_MAX) + file_name (256) + user (256)
-	// + group (256) + JSON keys/numbers (~200) + overhead
-	size_t buf_size = 1024 + (size_t)g_db_meta_count * (PATH_MAX + 1024);
+	// Each entry: escaped strings (up to 2x expansion) + JSON keys/numbers (~200) + overhead
+	size_t buf_size = 1024 + (size_t)g_db_meta_count * (PATH_MAX * 2 + 2048);
 	char *buf = malloc(buf_size);
 	if (!buf) return NULL;
+
+	char esc_path[PATH_MAX * 2];
+	char esc_name[512];
+	char esc_user[512];
+	char esc_group[512];
 
 	size_t offset = 0;
 	int n;
@@ -123,6 +166,12 @@ char *build_databases_json(void)
 
 	for (int i = 0; i < g_db_meta_count; i++) {
 		const JSON_DB_meta_data *meta = &g_db_meta[i];
+
+		// Escape all user-controlled strings
+		json_escape_string(esc_path, sizeof esc_path, meta->absolute_path);
+		json_escape_string(esc_name, sizeof esc_name, meta->file_name);
+		json_escape_string(esc_user, sizeof esc_user, meta->user);
+		json_escape_string(esc_group, sizeof esc_group, meta->group);
 
 		if (i > 0) {
 			n = snprintf(buf + offset, buf_size - offset, ",");
@@ -141,13 +190,13 @@ char *build_databases_json(void)
 		                   "\"mTime_sec\":%ld,"
 		                   "\"mTime_nsec\":%ld}",
 		                   meta->mode,
-		                   meta->absolute_path,
-		                   meta->file_name,
+		                   esc_path,
+		                   esc_name,
 		                   meta->file_size,
 		                   (long)meta->cTime,
 		                   (long)meta->bTime,
-		                   meta->user,
-		                   meta->group,
+		                   esc_user,
+		                   esc_group,
 		                   (long)meta->mTime.tv_sec,
 		                   (long)meta->mTime.tv_nsec);
 		if (n < 0 || offset + (size_t)n >= buf_size) { free(buf); return NULL; }
@@ -168,9 +217,19 @@ char *build_database_json(int index)
 	if (index < 0 || index >= g_db_meta_count) return NULL;
 
 	const JSON_DB_meta_data *meta = &g_db_meta[index];
-	size_t buf_size = 512;
+	size_t buf_size = 1024;
 	char *buf = malloc(buf_size);
 	if (!buf) return NULL;
+
+	char esc_path[PATH_MAX * 2];
+	char esc_name[512];
+	char esc_user[512];
+	char esc_group[512];
+
+	json_escape_string(esc_path, sizeof esc_path, meta->absolute_path);
+	json_escape_string(esc_name, sizeof esc_name, meta->file_name);
+	json_escape_string(esc_user, sizeof esc_user, meta->user);
+	json_escape_string(esc_group, sizeof esc_group, meta->group);
 
 	int len = snprintf(buf, buf_size,
 	                   "{\"mode\":\"%04o\","
@@ -184,13 +243,13 @@ char *build_database_json(int index)
 	                   "\"mTime_sec\":%ld,"
 	                   "\"mTime_nsec\":%ld}",
 	                   meta->mode,
-	                   meta->absolute_path,
-	                   meta->file_name,
+	                   esc_path,
+	                   esc_name,
 	                   meta->file_size,
 	                   (long)meta->cTime,
 	                   (long)meta->bTime,
-	                   meta->user,
-	                   meta->group,
+	                   esc_user,
+	                   esc_group,
 	                   (long)meta->mTime.tv_sec,
 	                   (long)meta->mTime.tv_nsec);
 

@@ -47,6 +47,17 @@ typedef struct {
 	RateLimit      *rl;
 } ClientJob;
 
+// Cleanup function called when a ClientJob is dropped (e.g. pool shutdown)
+static void client_job_drop(void *arg)
+{
+	ClientJob *job = arg;
+	if (!job) return;
+	if (job->rl)
+		ratelimit_leave(job->rl, job->client_ip);
+	transport_destroy(&job->t);
+	free(job);
+}
+
 static int wants_keep_alive(const HttpRequest *req, int keep_alive_timeout)
 {
 	if (keep_alive_timeout <= 0)
@@ -108,6 +119,8 @@ static void handle_client(void *arg)
 			file_serve(&req, t, client_ip, client_port,
 			           cfg.print_request, keep_alive);
 		}
+
+		http_request_cleanup(&req);
 
 		if (!keep_alive) {
 			LOG_DEBUG("Connection %s:%d closed (no keep-alive)", client_ip, client_port);
@@ -397,7 +410,7 @@ int server_run(const ServerConfig *cfg)
 		LOG_DEBUG("Accepted connection from %s:%d (fd=%d)",
 		          job->client_ip, job->client_port, cfd);
 
-		thread_pool_submit(pool, handle_client, job);
+		thread_pool_submit(pool, handle_client, client_job_drop, job);
 	}
 
 	LOG_INFO("Shutting down....");
