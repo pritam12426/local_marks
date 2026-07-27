@@ -1,5 +1,5 @@
-#ifndef _DATABASES_META_H_
-#define _DATABASES_META_H_
+#ifndef _DATABASES_META__H_
+#define _DATABASES_META__H_
 
 
 #include <limits.h>
@@ -42,4 +42,4 @@ char *build_database_json(int index);
 void db_meta_cleanup(void);
 
 
-#endif  // _DATABASES_META_H_
+#endif  // _DATABASES_META__H_

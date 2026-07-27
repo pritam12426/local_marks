@@ -35,6 +35,11 @@ void vfs_hash_init(void)
 
 	size_t inserted = 0;
 	for (size_t i = 0; vfs_table[i].file_path; i++) {
+		// Pre-compute content hash so file_serve() doesn't re-hash per request
+		if (vfs_table[i].file_len > 0 && vfs_table[i].file_start) {
+			vfs_table[i].content_hash = fnv1a_data(vfs_table[i].file_start,
+			                                        vfs_table[i].file_len);
+		}
 		if (inserted >= VFS_HASH_CAP) {
 			LOG_FATAL("vfs_hash: %zu embedded files exceed VFS_HASH_CAP=%d; "
 			          "raise VFS_MAX_FILES in vfs_hash.c",

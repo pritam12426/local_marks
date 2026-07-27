@@ -12,8 +12,8 @@
  * available worker.
  */
 
-#ifndef _THREAD_POOL_H_
-#define _THREAD_POOL_H_
+#ifndef _THREAD_POOL__H_
+#define _THREAD_POOL__H_
 
 
 #include <stddef.h>
@@ -40,4 +40,4 @@ void thread_pool_submit(ThreadPool *pool, ThreadTaskFunc func, ThreadTaskDropFun
 void thread_pool_destroy(ThreadPool *pool);
 
 
-#endif  // _THREAD_POOL_H_
+#endif  // _THREAD_POOL__H_

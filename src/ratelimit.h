@@ -11,8 +11,8 @@
  * when the configured limit is exceeded (HTTP 429).
  */
 
-#ifndef _RATELIMIT_H_
-#define _RATELIMIT_H_
+#ifndef _RATELIMIT__H_
+#define _RATELIMIT__H_
 
 
 typedef struct RateLimit RateLimit;
@@ -31,4 +31,4 @@ void ratelimit_leave(RateLimit *rl, const char *ip);
 void ratelimit_destroy(RateLimit *rl);
 
 
-#endif  // _RATELIMIT_H_
+#endif  // _RATELIMIT__H_

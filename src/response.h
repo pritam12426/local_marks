@@ -8,8 +8,8 @@
  * response.h — HTTP response builder API
  */
 
-#ifndef _RESPONSE_H_
-#define _RESPONSE_H_
+#ifndef _RESPONSE__H_
+#define _RESPONSE__H_
 
 
 #include <stddef.h>
@@ -35,4 +35,4 @@ void response_error(Transport *t, int status, const char *detail);
 // (SSE helpers live in livereload.h — not here)
 
 
-#endif  // _RESPONSE_H_
+#endif  // _RESPONSE__H_

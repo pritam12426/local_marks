@@ -178,8 +178,9 @@ async function ensureDataLoaded()
 	if (!dataPromise || loadedDbIdx !== dbIdx) {
 		const requestedIdx = dbIdx;
 		dataPromise = fetchBookmarks(dbIdx).then(d => {
-			data       = d;
+			data        = d;
 			loadedDbIdx = requestedIdx;
+			dataPromise = null;
 			return d;
 		}).catch(err => {
 			dataPromise = null;

@@ -22,7 +22,7 @@ typedef struct {
 
 static bookmark_cache_entry_t g_db_cache[MAX_BOOKMARK_FILES];
 static int g_db_cache_count = 0;
-static pthread_mutex_t g_bookmark_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_rwlock_t g_bookmark_cache_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 // Load bookmark JSON file into a cache entry
 static int load_bookmark_json(const char *path, bookmark_cache_entry_t *entry)
@@ -80,7 +80,6 @@ static int load_bookmark_json(const char *path, bookmark_cache_entry_t *entry)
 
 void bookmark_cache_init(void)
 {
-	pthread_mutex_init(&g_bookmark_cache_mutex, NULL);
 	for (int i = 0; i < MAX_BOOKMARK_FILES; i++) {
 		g_db_cache[i].json = NULL;
 		g_db_cache[i].json_len = 0;
@@ -92,7 +91,7 @@ void bookmark_cache_init(void)
 
 void bookmark_cache_cleanup(void)
 {
-	pthread_mutex_lock(&g_bookmark_cache_mutex);
+	pthread_rwlock_wrlock(&g_bookmark_cache_lock);
 	for (int i = 0; i < MAX_BOOKMARK_FILES; i++) {
 		free(g_db_cache[i].json);
 		g_db_cache[i].json = NULL;
@@ -101,8 +100,8 @@ void bookmark_cache_cleanup(void)
 		g_db_cache[i].path[0] = '\0';
 	}
 	g_db_cache_count = 0;
-	pthread_mutex_unlock(&g_bookmark_cache_mutex);
-	pthread_mutex_destroy(&g_bookmark_cache_mutex);
+	pthread_rwlock_unlock(&g_bookmark_cache_lock);
+	pthread_rwlock_destroy(&g_bookmark_cache_lock);
 }
 
 // Add a database path to the cache (call during startup for each DB)
@@ -110,7 +109,7 @@ void bookmark_cache_add_db(const char *path)
 {
 	if (!path) return;
 
-	pthread_mutex_lock(&g_bookmark_cache_mutex);
+	pthread_rwlock_wrlock(&g_bookmark_cache_lock);
 	if (g_db_cache_count < MAX_BOOKMARK_FILES) {
 		bookmark_cache_entry_t *entry = &g_db_cache[g_db_cache_count];
 		strncpy(entry->path, path, sizeof(entry->path) - 1);
@@ -120,12 +119,12 @@ void bookmark_cache_add_db(const char *path)
 		entry->mtime = 0;
 		g_db_cache_count++;
 	}
-	pthread_mutex_unlock(&g_bookmark_cache_mutex);
+	pthread_rwlock_unlock(&g_bookmark_cache_lock);
 }
 
 // Ensure a cache entry is loaded and up-to-date.
 // Returns entry with valid json on success, or NULL on failure.
-// Caller must hold g_bookmark_cache_mutex.
+// Caller must hold g_bookmark_cache_lock as writer.
 static bookmark_cache_entry_t *ensure_loaded(bookmark_cache_entry_t *entry)
 {
 	if (!entry) return NULL;
@@ -154,23 +153,49 @@ static bookmark_cache_entry_t *ensure_loaded(bookmark_cache_entry_t *entry)
 
 char *get_cached_bookmark_json_copy(int index, size_t *out_len)
 {
-	pthread_mutex_lock(&g_bookmark_cache_mutex);
+	// Phase 1: read lock — fast path when data is already cached and fresh
+	pthread_rwlock_rdlock(&g_bookmark_cache_lock);
 	if (index < 0 || index >= g_db_cache_count) {
-		pthread_mutex_unlock(&g_bookmark_cache_mutex);
+		pthread_rwlock_unlock(&g_bookmark_cache_lock);
+		return NULL;
+	}
+
+	bookmark_cache_entry_t *entry = &g_db_cache[index];
+	if (entry->json && entry->json_len > 0) {
+		// Check mtime under read lock (minor race: file might change between
+		// stat and copy, but that's benign — stale data for one request).
+		struct stat st;
+		if (stat(entry->path, &st) == 0 && st.st_mtime == entry->mtime) {
+			// Fast path: data is valid, copy under read lock
+			if (out_len) *out_len = entry->json_len;
+			char *copy = malloc(entry->json_len + 1);
+			if (copy)
+				memcpy(copy, entry->json, entry->json_len + 1);
+			pthread_rwlock_unlock(&g_bookmark_cache_lock);
+			return copy;
+		}
+	}
+
+	// Phase 2: need to load or reload — upgrade to write lock
+	pthread_rwlock_unlock(&g_bookmark_cache_lock);
+	pthread_rwlock_wrlock(&g_bookmark_cache_lock);
+
+	// Re-check after upgrading (another thread may have loaded it)
+	if (index < 0 || index >= g_db_cache_count) {
+		pthread_rwlock_unlock(&g_bookmark_cache_lock);
 		return NULL;
 	}
 
 	bookmark_cache_entry_t *ok = ensure_loaded(&g_db_cache[index]);
 	if (!ok) {
-		pthread_mutex_unlock(&g_bookmark_cache_mutex);
+		pthread_rwlock_unlock(&g_bookmark_cache_lock);
 		return NULL;
 	}
 
-	// Return a copy — safe to use after mutex unlock
 	if (out_len) *out_len = ok->json_len;
 	char *copy = malloc(ok->json_len + 1);
 	if (copy)
 		memcpy(copy, ok->json, ok->json_len + 1);
-	pthread_mutex_unlock(&g_bookmark_cache_mutex);
+	pthread_rwlock_unlock(&g_bookmark_cache_lock);
 	return copy;
 }

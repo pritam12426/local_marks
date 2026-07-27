@@ -4,8 +4,7 @@
 
 'use strict';
 
-import {buildCard} from './data.js';
-import {getFavorites} from './data.js';
+import {buildCard, getFavorites} from './data.js';
 import {renderTagBar, getActiveTags, setActiveTags} from './tag_bar.js';
 import {rebuildIndex} from './search.js';
 
@@ -49,9 +48,16 @@ export function renderPanel()
 		return true;
 	});
 
-	const filtered = activeTags.size ? bookmarks.filter(bm => [...activeTags].every(
-	                                                        t => (bm.tags || []).includes(t)))
-	                                 : bookmarks;
+	const filtered = activeTags.size
+		? bookmarks.filter(bm => {
+			const bmTags = bm.tags;
+			if (!bmTags) return false;
+			for (const t of activeTags) {
+				if (!bmTags.includes(t)) return false;
+			}
+			return true;
+		})
+		: bookmarks;
 
 	const countLabel = filtered.length !== bookmarks.length
 	                       ? `${filtered.length} of ${bookmarks.length}`
@@ -81,9 +87,16 @@ function renderFavorites(activeTags)
         return true;
     });
 
-	const filtered = activeTags.size ? bookmarks.filter(bm => [...activeTags].every(
-	                                                        t => (bm.tags || []).includes(t)))
-	                                 : bookmarks;
+	const filtered = activeTags.size
+		? bookmarks.filter(bm => {
+			const bmTags = bm.tags;
+			if (!bmTags) return false;
+			for (const t of activeTags) {
+				if (!bmTags.includes(t)) return false;
+			}
+			return true;
+		})
+		: bookmarks;
 
 	state.panelTitleEl.innerHTML = `⭐ Favorites <span class="panel-count">(${
 		filtered.length})</span>`;

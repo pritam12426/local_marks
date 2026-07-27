@@ -8,8 +8,8 @@
  * auth.h — HTTP Basic Authentication
  */
 
-#ifndef _AUTH_H_
-#define _AUTH_H_
+#ifndef _AUTH__H_
+#define _AUTH__H_
 
 
 #include "http.h"
@@ -26,4 +26,4 @@ int auth_check(const HttpRequest *req,
 void auth_send_challenge(Transport *t);
 
 
-#endif  // _AUTH_H_
+#endif  // _AUTH__H_

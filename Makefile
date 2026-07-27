@@ -69,6 +69,8 @@ FRONT_END_FILES = \
     front_end/javascript/info.js \
     front_end/javascript/keyboard.js \
     front_end/javascript/main.js \
+    front_end/javascript/modal.js \
+    front_end/javascript/notes.js \
     front_end/javascript/panel.js \
     front_end/javascript/random.js \
     front_end/javascript/search.js \
@@ -91,7 +93,7 @@ CFLAGS +=  -Wshadow -Wconversion \
            -Wstrict-prototypes -Wmissing-prototypes
 
 # Common flags
-CFLAGS += -Isrc -std=c17 -DLOG_SHOW_TIME_STAMP
+CFLAGS += -Isrc -std=c17
 LDLIBS +=  -lpthread
 
 # Source files
@@ -137,7 +139,7 @@ help:  ## Show this help
 $(BUILD):  ## Create build directories automatically
 	mkdir -p $(BUILD)
 
-$(BUILD)/%.o: %.c | $(FRONT_END_GENERATED_H) $(TLS_HEADER_DEP)
+$(BUILD)/%.o: %.c | $(TLS_HEADER_DEP)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
@@ -151,12 +153,9 @@ $(BUILD)/%.o: %.c | $(FRONT_END_GENERATED_H) $(TLS_HEADER_DEP)
 # Regenerate when any frontend file or the script itself changes
 $(FRONT_END_GENERATED_C): $(FRONT_END_FILES) $(FRONT_END_SCRIPT)
 	@OUT_C_FILE="$(FRONT_END_GENERATED_C)" \
-	OUT_H_FILE="$(EMBD_FRONT_END_H)" \
+	OUT__H_FILE="$(EMBD_FRONT_END_H)" \
 	TARGET_FILES="$(FRONT_END_FILES)" \
 	bash $(FRONT_END_SCRIPT)
-
-$(FRONT_END_GENERATED_H): $(FRONT_END_GENERATED_C)
-	@# Header is generated as side-effect of .c generation
 
 $(FRONT_END_GENERATED_O): $(FRONT_END_GENERATED_C)
 	@mkdir -p $(dir $@)
@@ -207,7 +206,7 @@ install: all  ## Install the local-mark binary
 
 clean:  ## Clean up build artifacts
 	# $(RM) -rf $(BUILD)/src/* $(DEP) $(BIN) $(FRONT_END_GENERATED_C)
-	$(RM) -rf $(BUILD)/src/* $(BIN) $(FRONT_END_GENERATED_C)
+	$(RM) -rf $(BUILD)/src/* $(BIN) $(FRONT_END_GENERATED_C) $(FRONT_END_GENERATED_O)
 
 clean-tls:  ## Remove downloaded TLS sources and their build objects
 	$(RM) -rf $(TLS_DIR) $(BUILD)/$(TLS_DIR)
@@ -215,7 +214,7 @@ clean-tls:  ## Remove downloaded TLS sources and their build objects
 uninstall:  ## Uninstall the local-mark binary
 	$(RM) $(DESTDIR)$(PREFIX)/bin/$(BIN)
 	$(RM) $(DESTDIR)$(PREFIX)/bin/marks2json
-	$(RM)$(DESTDIR)$(MANPREFIX)/man1/$(BIN).1
+	$(RM) $(DESTDIR)$(MANPREFIX)/man1/$(BIN).1
 
 strip: $(BIN)  ## Strip the local-mark binary
 	$(STRIP) $^

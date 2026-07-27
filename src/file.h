@@ -5,8 +5,8 @@
  * not from the real filesystem.
  */
 
-#ifndef _FILE_H_
-#define _FILE_H_
+#ifndef _FILE__H_
+#define _FILE__H_
 
 
 #include "http.h"
@@ -24,4 +24,4 @@ int file_serve(const HttpRequest *req,
                int                keep_alive);
 
 
-#endif  // _FILE_H_
+#endif  // _FILE__H_

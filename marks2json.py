@@ -5,9 +5,17 @@ import json
 import os
 import re
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
+
+try:
+	import requests
+except ImportError:
+	print("Error: 'requests' package is required for icon fetching and link checking.")
+	print("       Install it with: pip install requests", file=sys.stderr)
+	sys.exit(1)
 
 
 def excepthook(exc_type, exc_value, exc_tb):
@@ -48,8 +56,6 @@ def save_icon_cache(cache: dict[str, str]) -> None:
 
 
 def get_channel_icon_url(channel_url: str) -> str | None:
-	import requests
-
 	headers = {
 		"User-Agent": (
 			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -479,25 +485,30 @@ def categorize_status(status_code: int | None, error: str | None = None) -> str:
 
 
 def check_url(url: str, timeout: int = 10) -> dict:
-	"""Check a single URL with HEAD request, return result dict."""
-	import requests
-
-	try:
-		headers = {"User-Agent": "Mozilla/5.0 (compatible; marks2json/1.0)"}
-		resp = requests.head(url, headers=headers, timeout=timeout, allow_redirects=True)
-		return {"url": url, "status": resp.status_code, "category": categorize_status(resp.status_code), "error": None}
-	except requests.exceptions.Timeout:
-		return {"url": url, "status": None, "category": "error", "error": "Timeout"}
-	except requests.exceptions.ConnectionError:
-		return {"url": url, "status": None, "category": "error", "error": "Connection error"}
-	except requests.exceptions.TooManyRedirects:
-		return {"url": url, "status": None, "category": "error", "error": "Too many redirects"}
-	except requests.exceptions.RequestException as e:
-		return {"url": url, "status": None, "category": "error", "error": str(e)}
+	"""Check a single URL with HEAD request, return result dict.
+	Retries once on connection error (not timeout)."""
+	headers = {"User-Agent": "Mozilla/5.0 (compatible; marks2json/1.0)"}
+	for attempt in range(2):
+		try:
+			resp = requests.head(url, headers=headers, timeout=timeout, allow_redirects=True)
+			return {"url": url, "status": resp.status_code, "category": categorize_status(resp.status_code), "error": None}
+		except requests.exceptions.Timeout:
+			return {"url": url, "status": None, "category": "error", "error": "Timeout"}
+		except requests.exceptions.ConnectionError:
+			if attempt == 0:
+				time.sleep(1)
+				continue
+			return {"url": url, "status": None, "category": "error", "error": "Connection error"}
+		except requests.exceptions.TooManyRedirects:
+			return {"url": url, "status": None, "category": "error", "error": "Too many redirects"}
+		except requests.exceptions.RequestException as e:
+			return {"url": url, "status": None, "category": "error", "error": str(e)}
+	return {"url": url, "status": None, "category": "error", "error": "Unknown error"}
 
 
 def check_all_urls(urls: list[str], concurrency: int = 5, timeout: int = 10, progress_cb=None) -> list[dict]:
-	"""Check multiple URLs concurrently with progress callback."""
+	"""Check multiple URLs concurrently with progress callback.
+	Returns results sorted by URL for deterministic output."""
 	results = []
 	with ThreadPoolExecutor(max_workers=concurrency) as executor:
 		future_to_url = {executor.submit(check_url, url, timeout): url for url in urls}
@@ -505,6 +516,7 @@ def check_all_urls(urls: list[str], concurrency: int = 5, timeout: int = 10, pro
 			results.append(future.result())
 			if progress_cb:
 				progress_cb(future_to_url[future], i, len(urls))
+	results.sort(key=lambda r: r["url"])
 	return results
 
 
@@ -531,8 +543,6 @@ def print_health_table(results: list[dict], dead_statuses: set[str]) -> None:
 
 def cmd_find_dead(args: argparse.Namespace) -> None:
 	"""Check link health in database and optionally create healthy-only database."""
-	import requests  # noqa: F401 (used in check_url)
-
 	output: Path = args.to
 
 	if not output.exists():

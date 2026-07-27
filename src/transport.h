@@ -11,8 +11,8 @@
  * touches raw fd directly.
  */
 
-#ifndef _TRANSPORT_H_
-#define _TRANSPORT_H_
+#ifndef _TRANSPORT__H_
+#define _TRANSPORT__H_
 
 
 #include <stdbool.h>
@@ -59,4 +59,4 @@ void transport_set_tls(Transport *t, struct TLSContext *master_ctx);
 #endif  // SUPPORT_TLS_E
 
 
-#endif  // _TRANSPORT_H_
+#endif  // _TRANSPORT__H_

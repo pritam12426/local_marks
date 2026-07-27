@@ -103,6 +103,3 @@ const char *error_find_status_text(int status)
 		return error_table[status].status_text;
 	return "Internal Server Error";
 }
-
-int error_is_client_error(int status) { return status >= 400 && status < 500; }
-int error_is_server_error(int status) { return status >= 500; }

@@ -1,5 +1,5 @@
-#ifndef _VFS_HASH_H_
-#define _VFS_HASH_H_
+#ifndef _VFS_HASH__H_
+#define _VFS_HASH__H_
 
 
 #include "embd_front_end.h"  // vfs_entry, vfs_table[]
@@ -13,4 +13,4 @@ void vfs_hash_init(void);
 const vfs_entry *vfs_lookup(const char *path);
 
 
-#endif  // _VFS_HASH_H_
+#endif  // _VFS_HASH__H_

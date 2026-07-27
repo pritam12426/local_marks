@@ -18,8 +18,8 @@
  *   LOG_INFO("server started on port %d", 8080);
  */
 
-#ifndef _LOG_H_
-#define _LOG_H_
+#ifndef _LOG__H_
+#define _LOG__H_
 
 
 #include <stdbool.h> // bool
@@ -149,4 +149,4 @@ void log_record(Log_level_t level,
 #endif  // __cplusplus
 
 
-#endif  // _LOG_H_
+#endif  // _LOG__H_

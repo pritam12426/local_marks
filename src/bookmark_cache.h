@@ -1,5 +1,5 @@
-#ifndef _BOOKMARK_CACHE_H_
-#define _BOOKMARK_CACHE_H_
+#ifndef _BOOKMARK_CACHE__H_
+#define _BOOKMARK_CACHE__H_
 
 
 #include <stddef.h>
@@ -19,4 +19,4 @@ void bookmark_cache_add_db(const char *path);
 char *get_cached_bookmark_json_copy(int index, size_t *out_len);
 
 
-#endif  // _BOOKMARK_CACHE_H_
+#endif  // _BOOKMARK_CACHE__H_

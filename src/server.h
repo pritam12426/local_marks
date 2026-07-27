@@ -1,5 +1,5 @@
-#ifndef _SERVER_H_
-#define _SERVER_H_
+#ifndef _SERVER__H_
+#define _SERVER__H_
 
 #include <stdbool.h>
 
@@ -31,4 +31,4 @@ typedef struct {
 
 int server_run(const ServerConfig *cfg);
 
-#endif  // _SERVER_H_
+#endif  // _SERVER__H_

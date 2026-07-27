@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "fnv1a.h"
 #include "log.h"
 #include "mime.h"
 #include "project_config.h"
@@ -89,8 +88,8 @@ int file_serve(const HttpRequest *req,
 	const char *mime = mime_from_path(entry->file_path);
 	int         is_gzipped = (len >= 2 && data[0] == 0x1f && data[1] == 0x8b);
 
-	/* Generate ETag from content hash + size */
-	uint32_t content_hash = fnv1a_data(data, len);
+	/* Use pre-computed content hash for ETag (hash was computed once at vfs_hash_init) */
+	uint32_t content_hash = entry->content_hash;
 	char     etag[64];
 	build_etag(content_hash, len, etag, sizeof etag);
 

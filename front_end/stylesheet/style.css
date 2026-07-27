@@ -373,6 +373,41 @@ body.sidebar-resizing .main-panel {
 	color:      var(--accent);
 }
 
+/* ── Sidebar DB Info Bar ── */
+
+.sidebar-db-info {
+	flex-shrink:    0;
+	border-top:     1px solid var(--border);
+	padding:        10px 14px;
+	display:        flex;
+	flex-direction: column;
+	gap:            3px;
+	min-height:     42px;
+}
+
+.sdbi-skeleton {
+	height:        28px;
+	border-radius: var(--radius-xs);
+	background:    linear-gradient(90deg, var(--surface2) 25%, var(--surface3) 37%, var(--surface2) 63%);
+	background-size: 400% 100%;
+	animation:     skeleton-pulse 1.4s ease infinite;
+}
+
+.sdbi-name {
+	font-size:   12px;
+	font-weight: 600;
+	color:       var(--text);
+	white-space: nowrap;
+	overflow:    hidden;
+	text-overflow: ellipsis;
+}
+
+.sdbi-meta {
+	font-size:   11px;
+	color:       var(--muted);
+	font-family: var(--font-mono);
+}
+
 
 /* ── MAIN PANEL ── */
 
@@ -769,6 +804,133 @@ body.sidebar-resizing .main-panel {
 	font-family: var(--font-mono);
 	color:       var(--muted2);
 	margin-top:  4px;
+}
+
+
+/* ── Note indicator on bookmark cards ── */
+
+.bm-note-indicator {
+	font-size:     12px;
+	line-height:   1;
+	color:         var(--muted2);
+	cursor:        pointer;
+	flex-shrink:   0;
+	padding:       2px;
+	margin-top:    1px;
+	user-select:   none;
+	transition:    color var(--transition), transform var(--transition);
+	opacity:       0.4;
+}
+
+.bm-note-indicator:hover {
+	color:  var(--accent);
+	opacity: 1;
+	transform: scale(1.2);
+}
+
+.bm-note-indicator.has-note {
+	color:   var(--accent);
+	opacity: 1;
+}
+
+/* ── Notes modal ── */
+
+.note-modal {
+	padding: 20px;
+}
+
+.note-modal-header {
+	display:         flex;
+	align-items:     flex-start;
+	justify-content: space-between;
+	gap:             12px;
+	margin-bottom:   12px;
+}
+
+.note-modal-title {
+	font-size:   16px;
+	font-weight: 700;
+	color:       var(--text);
+	flex:        1;
+	min-width:   0;
+	white-space: nowrap;
+	overflow:    hidden;
+	text-overflow: ellipsis;
+}
+
+.note-meta {
+	font-size:   11px;
+	color:       var(--muted2);
+	margin-bottom: 10px;
+	font-family: var(--font-mono);
+}
+
+.note-textarea {
+	width:         100%;
+	min-height:    120px;
+	background:    var(--surface2);
+	border:        1px solid var(--border);
+	border-radius: var(--radius-sm);
+	padding:       12px;
+	color:         var(--text);
+	font-size:     13px;
+	font-family:   var(--font-ui);
+	line-height:   1.6;
+	resize:        vertical;
+	outline:       none;
+	transition:    border-color var(--transition), box-shadow var(--transition);
+}
+
+.note-textarea:focus {
+	border-color: var(--accent);
+	box-shadow:   0 0 0 3px var(--accent-glow);
+}
+
+.note-textarea::placeholder {
+	color: var(--muted2);
+}
+
+.note-modal-actions {
+	display:         flex;
+	align-items:     center;
+	justify-content: flex-end;
+	gap:             8px;
+	margin-top:      14px;
+}
+
+.note-btn {
+	font-size:   12px;
+	font-weight: 600;
+	padding:     6px 16px;
+	border-radius: 20px;
+	cursor:      pointer;
+	transition:  background var(--transition), color var(--transition),
+	             border-color var(--transition), transform 0.1s ease;
+}
+
+.note-btn:active {
+	transform: scale(0.95);
+}
+
+.note-btn-save {
+	color:         var(--bg);
+	background:    var(--accent);
+	border:        1px solid var(--accent);
+}
+
+.note-btn-save:hover {
+	opacity: 0.9;
+}
+
+.note-btn-delete {
+	color:         #f87171;
+	background:    none;
+	border:        1px solid rgba(248, 113, 113, 0.4);
+}
+
+.note-btn-delete:hover {
+	background:    rgba(248, 113, 113, 0.1);
+	border-color:  #f87171;
 }
 
 
@@ -1783,4 +1945,170 @@ body.route-databases {
 .state-empty .state-action:hover {
 	background: var(--accent);
 	color:      var(--surface);
+}
+
+
+/* =============================================
+   UX IMPROVEMENTS
+   ============================================= */
+
+/* ── Skeleton pulse (reusable) ── */
+
+@keyframes skeleton-pulse {
+	0%   { background-position: 100% 50%; }
+	100% { background-position: 0 50%; }
+}
+
+/* ── Page transition ── */
+
+@keyframes fadeSlideIn {
+	from { opacity: 0; transform: translateY(6px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+.view.active {
+	animation: fadeSlideIn 0.2s ease both;
+}
+
+/* ── Bookmark card hover polish ── */
+
+.bookmark-card {
+	transition: background var(--transition), border-color var(--transition),
+	            transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bookmark-card:hover {
+	transform:    translateY(-2px);
+	box-shadow:   0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.bookmark-card:active {
+	transform: translateY(0);
+	box-shadow: none;
+}
+
+/* ── DB card hover polish ── */
+
+.db-card {
+	transition: border-color var(--transition), background var(--transition),
+	            transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.db-card:hover {
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.db-card:active {
+	transform: translateY(0);
+	box-shadow: none;
+}
+
+/* ── Info button hover polish ── */
+
+.info-btn {
+	transition: color var(--transition), border-color var(--transition),
+	            background var(--transition), transform 0.12s ease;
+}
+
+.info-btn:hover {
+	transform: translateY(-1px);
+}
+
+/* ── Empty state fade-in ── */
+
+.state-empty {
+	animation: fadeSlideIn 0.25s ease both;
+}
+
+.state-empty .state-icon {
+	transition: transform 0.3s ease;
+}
+
+.state-empty:hover .state-icon {
+	transform: scale(1.15);
+}
+
+/* ── Tag pill click feedback ── */
+
+.tag-pill {
+	transition: color var(--transition), border-color var(--transition),
+	            background var(--transition), transform 0.1s ease;
+}
+
+.tag-pill:active {
+	transform: scale(0.95);
+}
+
+/* ── Star pop animation ── */
+
+@keyframes starPop {
+	0%   { transform: scale(1); }
+	50%  { transform: scale(1.4); }
+	100% { transform: scale(1); }
+}
+
+.bm-star.active {
+	animation: starPop 0.25s ease;
+}
+
+/* ── Category list item transitions ── */
+
+.category-list li {
+	transition: background var(--transition), color var(--transition),
+	            border-color var(--transition), transform 0.1s ease;
+}
+
+.category-list li:active {
+	transform: scale(0.97);
+}
+
+/* ── Random Go button polish ── */
+
+.random-go-btn {
+	transition: color var(--transition), border-color var(--transition),
+	            background var(--transition), transform 0.1s ease;
+}
+
+.random-go-btn:hover {
+	transform: translateY(-1px);
+}
+
+.random-go-btn:active {
+	transform: translateY(0);
+}
+
+/* ── Mobile improvements ── */
+
+@media (max-width: 768px) {
+	.sidebar-db-info {
+		display: none;
+	}
+
+	.bookmark-card:hover {
+		transform: none;
+		box-shadow: none;
+	}
+
+	.bookmark-card:active {
+		background: var(--surface3);
+	}
+
+	.db-card:hover {
+		transform: none;
+		box-shadow: none;
+	}
+
+	.db-card:active {
+		background: var(--surface2);
+	}
+
+	.category-list li:active {
+		background: var(--surface2);
+	}
+}
+
+@media (max-width: 480px) {
+	.sidebar-db-info {
+		display: none;
+	}
 }

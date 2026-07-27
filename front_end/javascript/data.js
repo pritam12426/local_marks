@@ -4,6 +4,34 @@
 
 'use strict';
 
+import {getNote, setNote, deleteNote} from './notes.js';
+import {openModal, closeModal} from './modal.js';
+
+// ── Shared IntersectionObserver for lazy favicons ──
+
+let faviconObserver = null;
+
+function getFaviconObserver()
+{
+	if (!faviconObserver) {
+		faviconObserver = new IntersectionObserver(entries => {
+			entries.forEach(entry => {
+				if (entry.isIntersecting) {
+					const img = entry.target;
+					img.src   = img.dataset.src;
+					img.onload  = () => img.classList.add('loaded');
+					img.onerror = () => {
+						img.src    = img.dataset.fallback;
+						img.onload = () => img.classList.add('loaded');
+					};
+					faviconObserver.unobserve(img);
+				}
+			});
+		}, {rootMargin: '100px'});
+	}
+	return faviconObserver;
+}
+
 // ── IndexedDB cache (per-database) ─────────
 
 const DB_NAME    = 'LocalMarksCache';
@@ -85,12 +113,27 @@ export async function getActiveDbName()
 
 // ── Database list & bookmark fetching ──────
 
+let databasesCache    = null;
+let databasesCacheTime = 0;
+const DATABASES_CACHE_TTL = 30000; // 30 seconds
+
 export async function fetchDatabases()
 {
+	const now = Date.now();
+	if (databasesCache && (now - databasesCacheTime) < DATABASES_CACHE_TTL)
+		return databasesCache;
+
 	const res = await fetch('/api/databases', {cache: 'no-cache'});
 	if (!res.ok)
 		throw new Error(`HTTP ${res.status}`);
-	return res.json();
+	databasesCache     = await res.json();
+	databasesCacheTime = now;
+	return databasesCache;
+}
+
+export function invalidateDatabasesCache()
+{
+	databasesCache = null;
 }
 
 export async function fetchBookmarks(idx = getActiveDbIndex())
@@ -128,7 +171,9 @@ export function esc(str)
 
 const FAVORITES_KEY = 'localmarks-favorites';
 
-export function getFavorites()
+let favoritesCache = null;
+
+function getFavoritesArray()
 {
 	try {
 		return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]');
@@ -137,18 +182,32 @@ export function getFavorites()
 	}
 }
 
+export function getFavorites()
+{
+	return getFavoritesArray();
+}
+
+function getFavoritesSet()
+{
+	if (!favoritesCache) {
+		favoritesCache = new Set(getFavoritesArray());
+	}
+	return favoritesCache;
+}
+
 export function toggleFavorite(url)
 {
-	let   favs = getFavorites();
+	let   favs = getFavoritesArray();
 	const idx  = favs.indexOf(url);
     idx === -1 ? favs.push(url) : favs.splice(idx, 1);
 	localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+	favoritesCache = null; // invalidate
 	window.dispatchEvent(new CustomEvent('favorites-changed'));
 }
 
 export function isFavorite(url)
 {
-	return getFavorites().includes(url);
+	return getFavoritesSet().has(url);
 }
 
 // ── Theme (localStorage + system preference) ─────────────────
@@ -252,6 +311,7 @@ export function buildCard(bm, {tagClickable, onTagClick} = {})
 {
 	const a     = document.createElement('a');
 	a.className = 'bookmark-card';
+	a.dataset.url = bm.url;
 	a.href      = '/redirect?url=' + encodeURIComponent(bm.url)
 	               + '&db=' + getActiveDbIndex()
 	               + '&title=' + encodeURIComponent(bm.title || bm.url);
@@ -263,10 +323,12 @@ export function buildCard(bm, {tagClickable, onTagClick} = {})
 	const faviconSrc   = bm.icon || `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
 	const fallbackSrc  = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
 	const starred      = isFavorite(bm.url);
+	const hasNotes     = hasNote(bm.url);
 
 	a.innerHTML = `
 		<span class="bm-star ${starred ? 'active' : ''}" data-url="${esc(bm.url)}">${
 		starred ? '★' : '☆'}</span>
+		<span class="bm-note-indicator ${hasNotes ? 'has-note' : ''}" data-url="${esc(bm.url)}" title="Add note">📝</span>
 		<img class="bm-favicon" data-lazy="true" data-src="${esc(faviconSrc)}" alt=""
 			data-fallback="${esc(fallbackSrc)}">
 		<div class="bm-body">
@@ -284,24 +346,10 @@ export function buildCard(bm, {tagClickable, onTagClick} = {})
 			<div class="bm-domain">${esc(domain)}</div>
 		</div>`;
 
-	// Lazy load favicon
+	// Lazy load favicon using shared observer
 	const faviconImg = a.querySelector('.bm-favicon');
 	if (faviconImg) {
-		const observer = new IntersectionObserver((entries) => {
-			entries.forEach(entry => {
-				if (entry.isIntersecting) {
-					const img  = entry.target;
-					img.src    = img.dataset.src;
-					img.onload = () => img.classList.add('loaded');
-					img.onerror = () => {
-						img.src    = img.dataset.fallback;
-						img.onload = () => img.classList.add('loaded');
-					};
-					observer.unobserve(img);
-				}
-			});
-		}, {rootMargin: '100px'});
-		observer.observe(faviconImg);
+		getFaviconObserver().observe(faviconImg);
 	}
 
 	a.querySelector('.bm-star').addEventListener('click', e => {
@@ -312,6 +360,15 @@ export function buildCard(bm, {tagClickable, onTagClick} = {})
 		e.currentTarget.classList.toggle('active');
 		e.currentTarget.textContent = isFavorite(url) ? '★' : '☆';
 	});
+
+	const noteBtn = a.querySelector('.bm-note-indicator');
+	if (noteBtn) {
+		noteBtn.addEventListener('click', e => {
+			e.preventDefault();
+			e.stopPropagation();
+			openNoteModal(bm.url, bm.title || bm.url);
+		});
+	}
 
 	if (tagClickable && onTagClick) {
 		a.querySelectorAll('.bm-tag').forEach(el => {
@@ -325,3 +382,83 @@ export function buildCard(bm, {tagClickable, onTagClick} = {})
 
 	return a;
 }
+
+// ── Notes ──────────────────────────────────
+
+let notesCache = null;
+
+function invalidateNotesCache()
+{
+	notesCache = null;
+}
+
+function hasNote(url)
+{
+	if (!notesCache) {
+		const dbIdx = getActiveDbIndex();
+		const key   = `localmarks-notes-${dbIdx}`;
+		try {
+			notesCache = JSON.parse(localStorage.getItem(key) || '{}');
+		} catch {
+			notesCache = {};
+		}
+	}
+	return !!notesCache[url];
+}
+
+function openNoteModal(url, title)
+{
+	const existing = getNote(url);
+	const text     = existing ? existing.text : '';
+	const updated  = existing ? new Date(existing.updated).toLocaleString() : '';
+
+	const metaHtml = updated
+		? `<div class="note-meta">Last edited: ${esc(updated)}</div>`
+		: '';
+
+	openModal(`
+		<div class="note-modal">
+			<div class="note-modal-header">
+				<h3 class="note-modal-title">${esc(title)}</h3>
+				<button class="modal-close" title="Close" aria-label="Close">&times;</button>
+			</div>
+			${metaHtml}
+			<textarea class="note-textarea" rows="6" placeholder="Write a note…">${esc(text)}</textarea>
+			<div class="note-modal-actions">
+				<button class="note-btn note-btn-delete" ${text ? '' : 'hidden'}>Delete</button>
+				<button class="note-btn note-btn-save">Save</button>
+			</div>
+		</div>
+	`);
+
+	const modal   = document.querySelector('.note-modal');
+	const textarea = modal.querySelector('.note-textarea');
+	const saveBtn  = modal.querySelector('.note-btn-save');
+	const delBtn   = modal.querySelector('.note-btn-delete');
+	const closeBtn = modal.querySelector('.modal-close');
+
+	closeBtn.addEventListener('click', closeModal);
+
+	saveBtn.addEventListener('click', () => {
+		setNote(url, textarea.value);
+		closeModal();
+		invalidateNotesCache();
+		window.dispatchEvent(new CustomEvent('note-changed', {detail: {url}}));
+	});
+
+	delBtn.addEventListener('click', () => {
+		deleteNote(url);
+		closeModal();
+		invalidateNotesCache();
+		window.dispatchEvent(new CustomEvent('note-changed', {detail: {url}}));
+	});
+
+	textarea.addEventListener('keydown', e => {
+		if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+			e.preventDefault();
+			saveBtn.click();
+		}
+	});
+}
+
+export {openNoteModal};

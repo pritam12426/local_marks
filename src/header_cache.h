@@ -8,8 +8,8 @@
  * header_cache.h — Pre-computed static HTTP header components
  */
 
-#ifndef _HEADER_CACHE_H_
-#define _HEADER_CACHE_H_
+#ifndef _HEADER_CACHE__H_
+#define _HEADER_CACHE__H_
 
 
 #include <stddef.h>
@@ -38,4 +38,4 @@ const char *header_cache_server(void);
 const char *header_cache_conn(int keep_alive);
 
 
-#endif  // _HEADER_CACHE_H_
+#endif  // _HEADER_CACHE__H_

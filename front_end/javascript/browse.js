@@ -44,6 +44,7 @@ export function initBrowse(data)
 	elTagBar       = document.getElementById('tag-bar');
 	elBookmarkList = document.getElementById('bookmark-list');
 	elHeaderTitle  = document.getElementById('header-title');
+	const elDbInfo       = document.getElementById('sidebar-db-info');
 
 	allCategories = data.book_Marks || data.categories || [];
 
@@ -52,7 +53,8 @@ export function initBrowse(data)
 		categories: allCategories,
 		activeCategory,
 		catListEl: elCatList,
-		sidebarCountEl: elSidebarCount
+		sidebarCountEl: elSidebarCount,
+		dbInfoEl: elDbInfo
 	});
 
 	initPanel({
@@ -97,7 +99,8 @@ export function updateCategories(newData)
 		categories: allCategories,
 		activeCategory: 0,
 		catListEl: elCatList,
-		sidebarCountEl: elSidebarCount
+		sidebarCountEl: elSidebarCount,
+		dbInfoEl: document.getElementById('sidebar-db-info')
 	});
 
 	initPanel({
@@ -219,21 +222,7 @@ function bindEvents()
 	window.addEventListener('tag-filter-from-search', e => {
 		const tags = getActiveTags();
 		tags.add(e.detail.tag);
-		// Switch to browse view with that category
-		// For simplicity, just re-render panel with new tag
 		renderPanel();
-	});
-
-	// Global shortcuts
-	document.addEventListener('keydown', e => {
-		if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-			e.preventDefault();
-			elSearch.focus();
-			elSearch.select();
-		}
-		if (e.key === 'Escape' && document.activeElement === elSearch) {
-			onClearSearch();
-		}
 	});
 }
 

@@ -43,7 +43,7 @@ typedef struct {
 	Transport      *t;
 	char            client_ip[INET6_ADDRSTRLEN];
 	int             client_port;
-	ServerConfig    cfg;
+	const ServerConfig *cfg;
 	RateLimit      *rl;
 } ClientJob;
 
@@ -78,7 +78,7 @@ static void handle_client(void *arg)
 	Transport *t    = job->t;
 	const char *client_ip  = job->client_ip;
 	int         client_port = job->client_port;
-	ServerConfig cfg        = job->cfg;
+	const ServerConfig *cfg = job->cfg;
 
 	int keep_alive = 0;
 	do {
@@ -89,15 +89,15 @@ static void handle_client(void *arg)
 			break;
 		}
 
-		if (cfg.print_request) {
+		if (cfg->print_request) {
 			LOG_CUSTOM(LOG_LEVEL_DEBUG, false,
 			           "--- Request from %s:%d ---\n%.*s---\n",
 			           client_ip, client_port,
 			           (int)req.raw_len, req.raw);
 		}
 
-		if (cfg.user || cfg.pass) {
-			if (!auth_check(&req, cfg.user, cfg.pass)) {
+		if (cfg->user || cfg->pass) {
+			if (!auth_check(&req, cfg->user, cfg->pass)) {
 				LOG_INFO("%s:%d \"%s %s %s\" 401",
 				         client_ip, client_port,
 				         http_method_str(req.method),
@@ -108,16 +108,16 @@ static void handle_client(void *arg)
 		}
 
 		// Compute keep-alive for this request
-		keep_alive = wants_keep_alive(&req, cfg.keep_alive_timeout);
+		keep_alive = wants_keep_alive(&req, cfg->keep_alive_timeout);
 
 		// Handle API endpoints first
 		if (api_handle_request(&req, t, client_ip, client_port,
-		                       &cfg, keep_alive, cfg.print_request)) {
+		                       (ServerConfig *)cfg, keep_alive, cfg->print_request)) {
 			// API handled the request
 		} else {
 			// Fall through to file serving
 			file_serve(&req, t, client_ip, client_port,
-			           cfg.print_request, keep_alive);
+			           cfg->print_request, keep_alive);
 		}
 
 		http_request_cleanup(&req);
@@ -128,7 +128,7 @@ static void handle_client(void *arg)
 		}
 
 		LOG_DEBUG("%s:%d keep-alive: reusing connection for next request", client_ip, client_port);
-		transport_set_timeout(t, cfg.keep_alive_timeout);
+		transport_set_timeout(t, cfg->keep_alive_timeout);
 	} while (!atomic_load_explicit(&g_shutdown, memory_order_relaxed));
 
 	if (job->rl)
@@ -394,7 +394,7 @@ int server_run(const ServerConfig *cfg)
 		}
 		job->t           = t;
 		job->client_port = 0;
-		job->cfg         = *cfg;
+		job->cfg         = cfg;
 		job->rl          = rl;
 		peer_addr(cfd, job->client_ip, sizeof(job->client_ip), &job->client_port);
 

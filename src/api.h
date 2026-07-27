@@ -1,5 +1,5 @@
-#ifndef _API_H_
-#define _API_H_
+#ifndef _API__H_
+#define _API__H_
 
 
 #include "http.h"
@@ -13,4 +13,4 @@ int api_handle_request(const HttpRequest *req, Transport *t,
                        const ServerConfig *cfg, int keep_alive, int print_request);
 
 
-#endif  // _API_H_
+#endif  // _API__H_

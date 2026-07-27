@@ -4,6 +4,8 @@
 
 'use strict';
 
+import {openNoteModal} from './data.js';
+
 const state = {
 	focusedCardIndex: -1,
 	cards: [],
@@ -152,8 +154,9 @@ function ensureHelpModal()
 					<tr><td><kbd>/</kbd></td><td>Focus search</td></tr>
 					<tr><td><kbd>Enter</kbd></td><td>Open focused bookmark (new tab)</td></tr>
 					<tr><td><kbd>o</kbd></td><td>Open focused bookmark (same tab)</td></tr>
-					<tr><td><kbd>yy</kbd></td><td>Copy URL to clipboard</td></tr>
-					<tr><td><kbd>p</kbd></td><td>Pin/unpin bookmark</td></tr>
+				<tr><td><kbd>yy</kbd></td><td>Copy URL to clipboard</td></tr>
+				<tr><td><kbd>p</kbd></td><td>Pin/unpin bookmark</td></tr>
+				<tr><td><kbd>n</kbd></td><td>Add/edit note</td></tr>
 					<tr><td><kbd>Esc</kbd></td><td>Clear search / close this window</td></tr>
 					<tr><td><kbd>?</kbd></td><td>Toggle this help window</td></tr>
 					<tr><td><kbd>Ctrl/Cmd+K</kbd></td><td>Focus search</td></tr>
@@ -195,24 +198,6 @@ function closeKeyboardHelp()
 		state.cards[state.focusedCardIndex].focus({preventScroll: true});
 	} else {
 		focusSidebar();
-	}
-}
-
-// Destroy keyboard module: remove event listeners and modal
-function destroyKeyboard()
-{
-	document.removeEventListener('keydown', handleGlobalKeys);
-	if (state.bookmarkListEl)
-		state.bookmarkListEl.removeEventListener('keydown', handleListKeys);
-	if (state.catListEl)
-		state.catListEl.removeEventListener('keydown', handleSidebarKeys);
-	if (state.searchEl) {
-		state.searchEl.removeEventListener('input', handleSearchInput);
-		state.searchEl.removeEventListener('keydown', handleSearchKeydown);
-	}
-	if (state.helpModal) {
-		state.helpModal.remove();
-		state.helpModal = null;
 	}
 }
 
@@ -295,11 +280,21 @@ function handleGlobalKeys(e)
 				star.click();
 		}
 		break;
+	case 'n':
+		if (state.focusedCardIndex >= 0 && state.cards[state.focusedCardIndex]) {
+			e.preventDefault();
+			const card  = state.cards[state.focusedCardIndex];
+			const url   = card.dataset.url || card.href;
+			const title = card.querySelector('.bm-title');
+			openNoteModal(url, title ? title.textContent : url);
+		}
+		break;
 	case 'y':
 		if (state.lastKey === 'y') {
 			e.preventDefault();
 			if (state.focusedCardIndex >= 0 && state.cards[state.focusedCardIndex]) {
-				const url = state.cards[state.focusedCardIndex].href;
+				const url = state.cards[state.focusedCardIndex].dataset.url
+				         || state.cards[state.focusedCardIndex].href;
 				navigator.clipboard.writeText(url).then(
 				    () => { showToast(`Copied: ${getDomain(url)}`); });
 			}
@@ -365,7 +360,7 @@ function handleSearchKeydown(e)
 
 function handleListKeys(e)
 {
-	if (e.target.closest('.bm-star') || e.target.closest('.bm-tag'))
+	if (e.target.closest('.bm-star') || e.target.closest('.bm-tag') || e.target.closest('.bm-note-indicator'))
 		return;
 
 	switch (e.key) {
@@ -380,6 +375,16 @@ function handleListKeys(e)
 		e.preventDefault();
 		e.stopPropagation();
 		focusPrevCard();
+		break;
+	case 'n':
+		if (state.focusedCardIndex >= 0 && state.cards[state.focusedCardIndex]) {
+			e.preventDefault();
+			e.stopPropagation();
+			const card  = state.cards[state.focusedCardIndex];
+			const url   = card.dataset.url || card.href;
+			const title = card.querySelector('.bm-title');
+			openNoteModal(url, title ? title.textContent : url);
+		}
 		break;
 	case 'Enter':
 		if (state.focusedCardIndex >= 0 && state.cards[state.focusedCardIndex]) {
@@ -448,9 +453,12 @@ function showToast(message)
 	toast.textContent = message;
 	document.body.appendChild(toast);
 
-	// Force reflow for animation
-	toast.offsetHeight;
-	toast.classList.add('show');
+	// Double-rAF for animation trigger (avoids forced reflow)
+	requestAnimationFrame(() => {
+		requestAnimationFrame(() => {
+			toast.classList.add('show');
+		});
+	});
 
 	setTimeout(() => {
 		toast.classList.remove('show');

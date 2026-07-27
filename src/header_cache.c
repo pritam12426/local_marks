@@ -25,8 +25,8 @@
 // Cached header components
 static char hc_date[64];
 static char hc_server[128];
-static char hc_conn_keep_alive[32] = "Connection: keep-alive\r\n";
-static char hc_conn_close[32] = "Connection: close\r\n";
+static const char hc_conn_keep_alive[] = "Connection: keep-alive\r\n";
+static const char hc_conn_close[] = "Connection: close\r\n";
 
 // Mutex for updating cached values
 static pthread_mutex_t hc_mutex = PTHREAD_MUTEX_INITIALIZER;

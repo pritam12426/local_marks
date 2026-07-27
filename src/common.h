@@ -1,5 +1,5 @@
-#ifndef _COMMON_H_
-#define _COMMON_H_
+#ifndef _COMMON__H_
+#define _COMMON__H_
 
 
 #define MAX_BOOKMARK_FILES 10
@@ -12,4 +12,4 @@
 #endif
 
 
-#endif  // _COMMON_H_
+#endif  // _COMMON__H_

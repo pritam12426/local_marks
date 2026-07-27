@@ -2,8 +2,8 @@
  * http.h — HTTP types and parsing interface
  */
 
-#ifndef _HTTP_H_
-#define _HTTP_H_
+#ifndef _HTTP__H_
+#define _HTTP__H_
 
 
 #include <stddef.h>
@@ -61,4 +61,4 @@ void http_url_decode(char *dst, size_t dst_size, const char *src);
 const char *http_method_str(HttpMethod m);
 
 
-#endif  // _HTTP_H_
+#endif  // _HTTP__H_

@@ -6,8 +6,8 @@
  *   fnv1a_data(data, len)  — hash an arbitrary byte buffer
  */
 
-#ifndef _FNV1A_H_
-#define _FNV1A_H_
+#ifndef _FNV1A__H_
+#define _FNV1A__H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -32,4 +32,4 @@ static inline uint32_t fnv1a_data(const unsigned char *data, size_t len)
 	return h;
 }
 
-#endif  // _FNV1A_H_
+#endif  // _FNV1A__H_

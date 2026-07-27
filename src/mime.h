@@ -8,8 +8,8 @@
  * mime.h — MIME type detection
  */
 
-#ifndef _MIME_H_
-#define _MIME_H_
+#ifndef _MIME__H_
+#define _MIME__H_
 
 
 /*
@@ -20,4 +20,4 @@
 const char *mime_from_path(const char *path);
 
 
-#endif  // _MIME_H_
+#endif  // _MIME__H_

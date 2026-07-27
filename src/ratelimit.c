@@ -36,6 +36,7 @@ struct RateLimit {
 	RLEntry        *table;
 	size_t          table_size;
 	size_t          used;
+	time_t          last_sweep;  // Last time stale entries were swept
 	pthread_mutex_t lock;
 };
 
@@ -103,6 +104,8 @@ RateLimit *ratelimit_create(int max_conns_per_ip)
 
 	rl->max_per_ip = max_conns_per_ip;
 	rl->table_size = RL_INITIAL_SIZE;
+	rl->used = 0;
+	rl->last_sweep = time(NULL);
 	rl->table = calloc(RL_INITIAL_SIZE, sizeof(RLEntry));
 	if (!rl->table) {
 		free(rl);
@@ -122,8 +125,12 @@ int ratelimit_accept(RateLimit *rl, const char *ip)
 
 	pthread_mutex_lock(&rl->lock);
 
-	// Sweep stale entries before checking load factor
-	ratelimit_sweep_stale(rl);
+	// Sweep stale entries periodically instead of on every accept
+	time_t now = time(NULL);
+	if (now - rl->last_sweep >= RL_STALE_TIMEOUT_SECS) {
+		ratelimit_sweep_stale(rl);
+		rl->last_sweep = now;
+	}
 
 	// Check load factor and grow if needed (using integer math to avoid float conversion)
 	if (rl->used * 4 >= rl->table_size * 3) {
@@ -133,7 +140,6 @@ int ratelimit_accept(RateLimit *rl, const char *ip)
 	}
 
 	unsigned long idx = hash_ip(ip) % rl->table_size;
-	time_t now = time(NULL);
 
 	// Linear probe: find either an empty slot or this IP's slot
 	for (size_t i = 0; i < rl->table_size; i++) {
@@ -187,11 +193,8 @@ void ratelimit_leave(RateLimit *rl, const char *ip)
 			rl->table[slot].count--;
 			rl->table[slot].last_activity = now;
 			LOG_TRACE("Rate limit leave: %s (count=%d)", ip, rl->table[slot].count);
-			if (rl->table[slot].count == 0) {
-				free(rl->table[slot].ip);
-				rl->table[slot].ip = NULL;
-				rl->used--;
-			}
+			// Don't free at count==0 — keep as dormant entry for reuse.
+			// ratelimit_sweep_stale() handles cleanup of old dormant entries.
 			break;
 		}
 	}
