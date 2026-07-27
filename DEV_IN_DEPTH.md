@@ -107,7 +107,7 @@ local_marks/
 ├── AGENTS.md                         # Agent instructions for this project
 ├── LICENSE                           # MIT License
 ├── Makefile                          # Build system (release, debug, install, clean, strip)
-├── PROJECT_BRIEF.md                  # This document
+├── DEV_IN_DEPTH.md                  # This document
 ├── README.md                         # Project overview
 ├── REFERENCES.md                     # External references & links
 ├── TODO.txt                          # Task list
