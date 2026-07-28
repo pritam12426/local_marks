@@ -17,13 +17,13 @@ static const struct {
 	const char *code;
 	const char *status_text;
 } error_table[] = {
-	/* 1xx – Informational */
+	// 1xx – Informational
 	[100] = { "CONTINUE",                         "Continue"                         },
 	[101] = { "SWITCHING_PROTOCOLS",              "Switching Protocols"              },
 	[102] = { "PROCESSING",                       "Processing"                       },
 	[103] = { "EARLY_HINTS",                      "Early Hints"                      },
 
-	/* 2xx – Success */
+	// 2xx – Success
 	[200] = { "OK",                               "OK"                               },
 	[201] = { "CREATED",                          "Created"                          },
 	[202] = { "ACCEPTED",                         "Accepted"                         },
@@ -35,7 +35,7 @@ static const struct {
 	[208] = { "ALREADY_REPORTED",                 "Already Reported"                 },
 	[226] = { "IM_USED",                          "IM Used"                          },
 
-	/* 3xx – Redirection */
+	// 3xx – Redirection
 	[301] = { "MOVED_PERMANENTLY",                "Moved Permanently"                },
 	[302] = { "FOUND",                            "Found"                            },
 	[303] = { "SEE_OTHER",                        "See Other"                        },
@@ -45,7 +45,7 @@ static const struct {
 	[307] = { "TEMPORARY_REDIRECT",               "Temporary Redirect"               },
 	[308] = { "PERMANENT_REDIRECT",               "Permanent Redirect"               },
 
-	/* 4xx – Client Errors */
+	// 4xx – Client Errors
 	[400] = { "BAD_REQUEST",                      "Bad Request"                      },
 	[401] = { "UNAUTHORIZED",                     "Unauthorized"                     },
 	[402] = { "PAYMENT_REQUIRED",                 "Payment Required"                 },
@@ -76,7 +76,7 @@ static const struct {
 	[431] = { "REQUEST_HEADER_FIELDS_TOO_LARGE",  "Request Header Fields Too Large"  },
 	[451] = { "UNAVAILABLE_FOR_LEGAL_REASONS",    "Unavailable For Legal Reasons"    },
 
-	/* 5xx – Server Errors */
+	// 5xx – Server Errors
 	[500] = { "INTERNAL_SERVER_ERROR",            "Internal Server Error"            },
 	[501] = { "NOT_IMPLEMENTED",                  "Not Implemented"                  },
 	[502] = { "BAD_GATEWAY",                      "Bad Gateway"                      },

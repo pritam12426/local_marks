@@ -13,14 +13,14 @@
 #include "vfs_hash.h"
 #include "header_cache.h"
 
-/* ── argp global strings ──────────────────────────────────────────────────── */
+// ── argp global strings ────────────────────────────────────────────────────
 // These are used by --version and --help automatically
 // project_config.h defines VERSION, HOMEPAGE_URL, and AUTH_MESSAGE
 const char *argp_program_version     = MAIN_BINARY " " PROJECT_VERSION;
 const char *argp_program_bug_address = PROJECT_HOMEPAGE_URL "/issues" "\n" AUTH_MESSAGE;
 static char doc[]                    = MAIN_BINARY " - " PROJECT_DESC;
 
-/* ── CLI option table ─────────────────────────────────────────────────────── */
+// ── CLI option table ───────────────────────────────────────────────────────
 // Each option group has a section number for grouping in --help output
 static struct argp_option options[] = {
 	{ 0, 0, 0, 0, "Logging:", 1 },
@@ -49,7 +49,7 @@ static struct argp_option options[] = {
 	{ 0 }
 };
 
-/* ── Arguments struct (mirrors ServerConfig) ──────────────────────────────── */
+// ── Arguments struct (mirrors ServerConfig) ────────────────────────────────
 // Stored as globals so parse_opt() can fill them; later copied into ServerConfig
 typedef struct {
 	const char  *user;             // -u: Basic-Auth username (NULL = disabled)
@@ -99,7 +99,7 @@ static Arguments G_Args = {
 
 };
 
-/* ── Option parser ────────────────────────────────────────────────────────── */
+// ── Option parser ──────────────────────────────────────────────────────────
 // Called by argp for each CLI flag; key is the short-option character
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
@@ -217,7 +217,7 @@ static struct argp argp = {
 	.args_doc = "<DB_FILE(s)>...",
 };
 
-/* ── main ─────────────────────────────────────────────────────────────────── */
+// ── main ───────────────────────────────────────────────────────────────────
 int main(int argc, char *argv[])
 {
 	// Parse CLI args; argp calls parse_opt() for each flag

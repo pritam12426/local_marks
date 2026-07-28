@@ -51,7 +51,7 @@ void vfs_hash_init(void)
 		uint32_t idx    = fnv1a_str(vfs_table[i].file_path) & (VFS_HASH_CAP - 1);
 		size_t   probes = 0;
 		while (slots[idx] != NULL) {
-			idx = (idx + 1) & (VFS_HASH_CAP - 1); /* linear probing */
+			idx = (idx + 1) & (VFS_HASH_CAP - 1); // linear probing
 			probes++;
 			if (probes >= VFS_HASH_CAP) {
 				/* Table is completely full: without this bound, the loop
@@ -90,7 +90,7 @@ const vfs_entry *vfs_lookup(const char *path)
 		const vfs_entry *e = slots[idx];
 		if (e == NULL) {
 			LOG_TRACE("vfs_hash: lookup \"%s\" -> miss (%zu probes)", path, i);
-			return NULL; /* empty slot: definitely not present (no deletions occur) */
+			return NULL; // empty slot: definitely not present (no deletions occur)
 		}
 		if (strcmp(e->file_path, path) == 0) {
 			LOG_TRACE("vfs_hash: lookup \"%s\" -> hit (%zu probes)", path, i);

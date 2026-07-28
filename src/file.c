@@ -62,12 +62,12 @@ int file_serve(const HttpRequest *req,
 		return 405;
 	}
 
-	/* Strip leading '/' for VFS lookup: "/" → "index.html", "/foo" → "foo" */
+	// Strip leading '/' for VFS lookup: "/" → "index.html", "/foo" → "foo"
 	const char *path = req->path;
 	if (*path == '/')
 		path++;
 
-	/* Default to index.html for root */
+	// Default to index.html for root
 	if (*path == '\0')
 		path = "index.html";
 
@@ -88,12 +88,12 @@ int file_serve(const HttpRequest *req,
 	const char *mime = mime_from_path(entry->file_path);
 	int         is_gzipped = (len >= 2 && data[0] == 0x1f && data[1] == 0x8b);
 
-	/* Use pre-computed content hash for ETag (hash was computed once at vfs_hash_init) */
+	// Use pre-computed content hash for ETag (hash was computed once at vfs_hash_init)
 	uint32_t content_hash = entry->content_hash;
 	char     etag[64];
 	build_etag(content_hash, len, etag, sizeof etag);
 
-	/* Conditional GET: If-None-Match */
+	// Conditional GET: If-None-Match
 	if (req->if_none_match[0] && strcmp(req->if_none_match, etag) == 0) {
 		LOG_INFO("%s:%d \"VFS:%s\" 304 (ETag match)", client_ip, client_port, req->path);
 		char extra[256];
@@ -108,13 +108,13 @@ int file_serve(const HttpRequest *req,
 	         client_ip, client_port, http_method_str(req->method), vfs_path, mime, len,
 	         is_gzipped ? ", gzip" : "");
 
-	/* Range request handling */
+	// Range request handling
 	long range_first = 0, range_last = (long) len - 1;
 	int  is_range = 0;
 
 	if (req->range_start != -1) {
 		if (req->range_start < 0) {
-			/* Suffix range: bytes=-500 → last 500 bytes */
+			// Suffix range: bytes=-500 → last 500 bytes
 			range_first = (long) len + (long) req->range_start;
 			if (range_first < 0)
 				range_first = 0;
@@ -165,7 +165,7 @@ int file_serve(const HttpRequest *req,
 		         etag);
 	}
 
-	/* Add Content-Encoding for gzip-compressed embedded files */
+	// Add Content-Encoding for gzip-compressed embedded files
 	if (is_gzipped) {
 		size_t cur = strlen(extra);
 		snprintf(extra + cur, sizeof extra - cur,

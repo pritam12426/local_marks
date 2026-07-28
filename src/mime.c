@@ -14,9 +14,9 @@
 
 #include "log.h"
 
-/* ------------------------------------------------------------------ */
-/*  MIME table                                                          */
-/* ------------------------------------------------------------------ */
+// ------------------------------------------------------------------
+// MIME table
+// ------------------------------------------------------------------
 
 // Ordered list of extension → MIME type mappings.
 // The fallback (NULL extension) MUST be last.
@@ -24,23 +24,23 @@ static const struct {
 	const char *ext;
 	const char *mime;
 } mime_map[] = {
-	/* HTML */
+	// HTML
 	{ ".html",  "text/html; charset=utf-8"        },
 	{ ".htm",   "text/html; charset=utf-8"        },
 
-	/* Stylesheets */
+	// Stylesheets
 	{ ".css",   "text/css"                        },
 
-	/* Scripts */
+	// Scripts
 	{ ".js",    "application/javascript"          },
 	{ ".mjs",   "application/javascript"          },
 	{ ".ts",    "application/typescript"          },
 
-	/* Data */
+	// Data
 	{ ".json",  "application/json"                },
 	{ ".xml",   "application/xml"                 },
 
-	/* Raster images */
+	// Raster images
 	{ ".png",   "image/png"                       },
 	{ ".jpg",   "image/jpeg"                      },
 	{ ".jpeg",  "image/jpeg"                      },
@@ -51,16 +51,16 @@ static const struct {
 	{ ".bmp",   "image/bmp"                       },
 	{ ".tiff",  "image/tiff"                      },
 
-	/* Vector */
+	// Vector
 	{ ".svg",   "image/svg+xml"                   },
 
-	/* Fonts */
+	// Fonts
 	{ ".woff",  "font/woff"                       },
 	{ ".woff2", "font/woff2"                      },
 	{ ".ttf",   "font/ttf"                        },
 	{ ".otf",   "font/otf"                        },
 
-	/* Audio */
+	// Audio
 	{ ".mp3",   "audio/mpeg"                      },
 	{ ".ogg",   "audio/ogg"                       },
 	{ ".opus",  "audio/opus"                      },
@@ -68,36 +68,35 @@ static const struct {
 	{ ".flac",  "audio/flac"                      },
 	{ ".aac",   "audio/aac"                       },
 
-	/* Video */
+	// Video
 	{ ".mp4",   "video/mp4"                       },
 	{ ".webm",  "video/webm"                      },
 	{ ".ogv",   "video/ogg"                       },
 	{ ".mov",   "video/quicktime"                 },
 	{ ".avi",   "video/x-msvideo"                 },
 
-	/* Text */
+	// Text
 	{ ".txt",   "text/plain; charset=utf-8"       },
 	{ ".md",    "text/plain; charset=utf-8"       },
 	{ ".csv",   "text/csv; charset=utf-8"         },
 
-	/* Documents */
+	// Documents
 	{ ".pdf",   "application/pdf"                 },
 
-	/* Archives */
+	// Archives
 	{ ".zip",   "application/zip"                 },
 	{ ".gz",    "application/gzip"                },
 	{ ".tar",   "application/x-tar"               },
 
-	/* WASM */
+	// WASM
 	{ ".wasm",  "application/wasm"                },
 
-	/* Fallback — must be last */
+	// Fallback — must be last
 	{ NULL,     "application/octet-stream"        },
 };
 
-/* ------------------------------------------------------------------ */
-/*  Public API                                                          */
-/* ------------------------------------------------------------------ */
+
+// --- Public API ---------------------------------------------------
 
 // Look up the MIME type for a file path by its extension.
 // Extension matching is case-insensitive.
