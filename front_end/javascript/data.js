@@ -312,9 +312,7 @@ export function buildCard(bm, {tagClickable, onTagClick} = {})
 	const a     = document.createElement('a');
 	a.className = 'bookmark-card';
 	a.dataset.url = bm.url;
-	a.href      = '/redirect?url=' + encodeURIComponent(bm.url)
-	               + '&db=' + getActiveDbIndex()
-	               + '&title=' + encodeURIComponent(bm.title || bm.url);
+	a.href      = bm.url;
 	a.target    = '_blank';
 	a.rel       = 'noopener noreferrer';
 
