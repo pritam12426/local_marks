@@ -9,18 +9,22 @@ Reads `bookmarks.json` DB; serves frontend + API over HTTP using a thread pool.
 
 ```sh
 make                           # release build → ./local-mark
-make debug -B O_DEBUG=1        # debug build (-g3 -DDEBUG, sanitizers)
-make clean
+make help                      # list O_ variables and targets
+make clean && make             # clean rebuild (required after header changes)
+make debug -B O_DEBUG=1        # debug build (-g3 -DDEBUG, ASan+UBSan)
+make tls                       # build with TLS (downloads tlse into third_party/)
+make strip                     # strip debug symbols
 make install                   # installs to PREFIX (default /usr/local)
 ```
 
 - Compiler: clang, `-std=c17`, source in `src/*.{c,h}`, objects → `build/`.
 - macOS prerequisite: `brew install argp-standalone` (links `-largp`).
 - Linux: `-D_GNU_SOURCE` is added automatically.
-- Frontend embedding also requires `gzip` and `xxd` (both ship with macOS; on Linux install via `apt install xxd gzip`).
+- Frontend embedding requires `gzip` and `xxd` (ship with macOS; on Linux: `apt install xxd gzip`).
 - `LOG_SHOW_TIME_STAMP` and `LOG_SHOW_SOURCE_LOCATION` are always on.
 - Debug builds enable `-fsanitize=address`, `-fsanitize=undefined`, `-fstack-usage`.
-- Frontend embedding: `front_end/embed_frontend.bash` runs `xxd -i` per file → C arrays + `vfs_entry` table in `build/gen_embedded_front_end_dir.c` + `src/gen_embedded_front_end_dir.h`. The script gzip-compresses each file before embedding. The Makefile re-runs it when any `FRONT_END_FILES` or the script changes.
+- Frontend embedding: `front_end/embed_frontend.bash` gzip-compresses each file → `xxd -i` → C arrays + `vfs_entry` table in `build/gen_embedded_front_end_dir.c`. The Makefile re-runs it when any `FRONT_END_FILES` or the script changes.
+- **Headers are not tracked in Makefile deps** — run `make clean` after changing any `.h` file.
 
 ## CLI
 
@@ -67,7 +71,7 @@ Positional `<DB_FILE(s)>...` required (max 10, set in `common.h`).
 | `src/databases_meta.c` / `src/databases_meta.h` | File metadata (stat, user/group, realpath)                      |
 | `src/header_cache.c` / `src/header_cache.h`     | Pre-computed Date/Server/Connection headers                     |
 | `src/embd_front_end.h`                          | Frontend embedding declarations (included by `file.c`)          |
-| `src/gen_embedded_front_end_dir.h`              | Auto-generated: `vfs_entry` struct + extern arrays              |
+| `build/gen_embedded_front_end_dir.c`            | Auto-generated: gzip-compressed C arrays + `vfs_entry` table    |
 | `src/fnv1a.h`                                   | Header-only FNV-1a hash (used by `vfs_hash.c`)                 |
 | `src/common.h`                                  | Shared constants (MAX_BOOKMARK_FILES)                           |
 | `src/project_config.h`                          | Version, name, metadata                                         |
@@ -139,7 +143,4 @@ LOG_PERROR("bind failed");    // logs message + appends perror
 - `*.json` is gitignored — bookmark files (`bookmarks*.json`) must be force-added
   with `git add -f` if committing them.
 - `compile_commands.json` in the repo root is generated for clangd/IDE navigation.
-- Source copied from [live_server](https://github.com/pritam12426/live_server)
-  (`server.c`, `http.c`, `response.c`, `transport.c`, `auth.c`, `thread_pool.c`,
-  `ratelimit.c`, `mime.c`) — adapted to serve embedded VFS files instead of
-  real filesystem files.
+
